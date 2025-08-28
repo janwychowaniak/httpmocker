@@ -1,0 +1,62 @@
+{
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/users",
+      "status": 200,
+      "payload_file": "payloads/example.json",
+      "delay_ms": 150
+    },
+    {
+      "method": "POST",
+      "path": "/api/login",
+      "status": 401,
+      "payload_inline": {
+        "error": "invalid_credentials",
+        "message": "Username or password is incorrect",
+        "code": 401,
+        "timestamp": "2024-01-15T10:30:00Z"
+      },
+      "delay_ms": 200
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "status": 200,
+      "payload_inline": {
+        "status": "healthy",
+        "version": "1.0.0",
+        "uptime": "42 minutes"
+      },
+      "delay_ms": 0
+    },
+    {
+      "method": "GET",
+      "path": "/api/slow",
+      "status": 200,
+      "payload_inline": {
+        "message": "This endpoint simulates a slow response",
+        "processing_time": "2 seconds"
+      },
+      "delay_ms": 2000
+    },
+    {
+      "method": "PUT",
+      "path": "/api/users/123",
+      "status": 404,
+      "payload_inline": {
+        "error": "user_not_found",
+        "message": "User with ID 123 does not exist",
+        "code": 404
+      },
+      "delay_ms": 100
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/sessions",
+      "status": 204,
+      "payload_inline": {},
+      "delay_ms": 50
+    }
+  ]
+}

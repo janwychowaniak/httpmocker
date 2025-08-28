@@ -24,7 +24,7 @@ pip install -r requirements.txt
 ## Quick Start
 
 ```bash
-cp config.example.json config.json           # 1. Copy the example configuration
+cp config_example.json config.json           # 1. Copy the example configuration
 python -m httpmocker -p 8080 -c config.json  # 2. Run the mock server
 
 curl http://localhost:8080/api/users         # 3. Test with curl
@@ -189,7 +189,7 @@ Bottle automatically decodes URL-encoded paths, so configure paths in decoded fo
 
 ```
 httpmocker/
-├── config.example.json       # Example configuration file
+├── config_example.json       # Example configuration file
 ├── httpmocker/
 │   ├── __init__.py
 │   ├── __main__.py           # CLI entry point  
@@ -261,7 +261,7 @@ Create different configuration files for various testing scenarios:
 
 ```bash
 # Test with curl
-python -m httpmocker -p 8080 -c config.example.json
+python -m httpmocker -p 8080 -c config_example.json
 
 # In another terminal
 curl -X GET http://localhost:8080/api/users

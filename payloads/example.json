@@ -1,0 +1,53 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "alice_admin",
+      "email": "alice@example.com",
+      "role": "administrator",
+      "status": "active",
+      "created_at": "2024-01-01T12:00:00Z",
+      "profile": {
+        "first_name": "Alice",
+        "last_name": "Johnson",
+        "department": "Engineering"
+      }
+    },
+    {
+      "id": 2,
+      "username": "bob_dev",
+      "email": "bob@example.com",
+      "role": "developer",
+      "status": "active",
+      "created_at": "2024-01-05T09:30:00Z",
+      "profile": {
+        "first_name": "Bob",
+        "last_name": "Smith",
+        "department": "Engineering"
+      }
+    },
+    {
+      "id": 3,
+      "username": "carol_designer",
+      "email": "carol@example.com",
+      "role": "designer",
+      "status": "inactive",
+      "created_at": "2024-01-10T14:15:00Z",
+      "profile": {
+        "first_name": "Carol",
+        "last_name": "Williams",
+        "department": "Design"
+      }
+    }
+  ],
+  "pagination": {
+    "total": 3,
+    "page": 1,
+    "per_page": 10,
+    "total_pages": 1
+  },
+  "meta": {
+    "retrieved_at": "2024-01-15T10:30:00Z",
+    "api_version": "v1"
+  }
+}
