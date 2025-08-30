@@ -2,7 +2,7 @@ import json
 import os
 from pathlib import Path
 from typing import Dict, Any, Optional, Union
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class Endpoint(BaseModel):
@@ -14,21 +14,24 @@ class Endpoint(BaseModel):
     payload_inline: Optional[Dict[str, Any]] = Field(None, description="Inline JSON payload")
     payload_file: Optional[str] = Field(None, description="Path to external payload file")
 
-    @validator('method')
+    @field_validator('method')
+    @classmethod
     def validate_method(cls, v):
         """Ensure HTTP method is uppercase."""
         if not v.isupper():
             raise ValueError(f"HTTP method must be uppercase, got: {v}")
         return v
 
-    @validator('status')
+    @field_validator('status')
+    @classmethod
     def validate_status(cls, v):
         """Ensure status code is valid HTTP status."""
         if not (100 <= v <= 599):
             raise ValueError(f"HTTP status code must be between 100-599, got: {v}")
         return v
 
-    @validator('delay_ms')
+    @field_validator('delay_ms')
+    @classmethod
     def validate_delay(cls, v):
         """Ensure delay is non-negative."""
         if v < 0:
@@ -51,7 +54,8 @@ class Config(BaseModel):
     """Configuration model for the entire application."""
     endpoints: list[Endpoint] = Field(..., description="List of endpoint configurations")
 
-    @validator('endpoints')
+    @field_validator('endpoints')
+    @classmethod
     def validate_endpoints_not_empty(cls, v):
         """Ensure at least one endpoint is configured."""
         if not v:
