@@ -1,7 +1,6 @@
 import json
 import os
-from pathlib import Path
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -26,7 +25,7 @@ class Endpoint(BaseModel):
     @classmethod
     def validate_status(cls, v):
         """Ensure status code is valid HTTP status."""
-        if not (100 <= v <= 599):
+        if not 100 <= v <= 599:
             raise ValueError(f"HTTP status code must be between 100-599, got: {v}")
         return v
 
@@ -43,7 +42,7 @@ class Endpoint(BaseModel):
         # Ensure exactly one payload type is specified
         has_inline = self.payload_inline is not None
         has_file = self.payload_file is not None
-        
+
         if not has_inline and not has_file:
             raise ValueError("Either payload_inline or payload_file must be specified")
         if has_inline and has_file:
@@ -69,10 +68,10 @@ def load_config(config_path: str) -> Config:
     
     Args:
         config_path: Path to the configuration JSON file
-        
+
     Returns:
         Validated Config object
-        
+
     Raises:
         SystemExit: On configuration errors (with clean error messages)
     """
@@ -81,7 +80,7 @@ def load_config(config_path: str) -> Config:
         if not os.path.exists(config_path):
             print(f"Error: Configuration file not found: {config_path}")
             raise SystemExit(1)
-        
+
         # Load and parse JSON
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
@@ -92,19 +91,19 @@ def load_config(config_path: str) -> Config:
         except Exception as e:
             print(f"Error: Could not read configuration file: {e}")
             raise SystemExit(1)
-        
+
         # Validate configuration structure
         try:
             config = Config(**config_data)
         except Exception as e:
             print(f"Error: Invalid configuration: {e}")
             raise SystemExit(1)
-        
+
         # Validate payload files exist
         _validate_payload_files(config)
-        
+
         return config
-        
+
     except SystemExit:
         raise
     except Exception as e:
@@ -118,17 +117,17 @@ def _validate_payload_files(config: Config) -> None:
     
     Args:
         config: Validated configuration object
-        
+
     Raises:
         SystemExit: If any payload file is missing
     """
     missing_files = []
-    
+
     for endpoint in config.endpoints:
         if endpoint.payload_file:
             if not os.path.exists(endpoint.payload_file):
                 missing_files.append(endpoint.payload_file)
-    
+
     if missing_files:
         print("Error: Missing payload files:")
         for file_path in missing_files:
@@ -142,10 +141,10 @@ def load_payload_file(file_path: str) -> Dict[str, Any]:
     
     Args:
         file_path: Path to the payload JSON file
-        
+
     Returns:
         Parsed JSON data
-        
+
     Raises:
         SystemExit: On file loading or JSON parsing errors
     """

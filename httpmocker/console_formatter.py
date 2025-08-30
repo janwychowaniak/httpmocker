@@ -1,8 +1,7 @@
 import json
-from typing import Dict, Any, Optional
+from typing import Any
 from rich.console import Console
 from rich.syntax import Syntax
-from rich.text import Text
 from bottle import BaseRequest
 
 
@@ -13,22 +12,24 @@ console = Console()
 def log_request_received(request: BaseRequest, client_address: str) -> None:
     """
     Log incoming HTTP request with full details.
-    
+
     Args:
         request: Bottle request object
         client_address: Client IP address and port
     """
+    console.print()  # Empty line
     console.print("~" * 70, style="cyan")
+    console.print()  # Empty line
     console.print(f"Connection received on localhost {client_address}", style="bright_white")
-    
+
     # Request line
     query_string = f"?{request.query_string}" if request.query_string else ""
     console.print(f"{request.method} {request.path}{query_string} HTTP/1.1", style="bright_yellow")
-    
+
     # Headers
     for header_name, header_value in request.headers.items():
         console.print(f"{header_name:<12} {header_value}", style="white")
-    
+
     # Request body (if present)
     if hasattr(request, 'json') and request.json:
         console.print()  # Empty line
@@ -46,10 +47,11 @@ def log_request_received(request: BaseRequest, client_address: str) -> None:
         request.body.seek(0)
 
 
-def log_response_matched(method: str, path: str, status: int, payload_source: str, delay_ms: int) -> None:
+def log_response_matched(method: str, path: str, status: int,
+                         payload_source: str, delay_ms: int) -> None:
     """
     Log successful endpoint match and response details.
-    
+
     Args:
         method: HTTP method
         path: Request path
@@ -60,7 +62,7 @@ def log_response_matched(method: str, path: str, status: int, payload_source: st
     console.print()
     console.print("-" * 70, style="dim cyan")
     console.print()
-    
+
     console.print(f"Response: {method} {path}", style="bright_green")
     console.print(f" - status:         {status}", style="green")
     console.print(f" - {payload_source}", style="green")
@@ -72,7 +74,7 @@ def log_response_matched(method: str, path: str, status: int, payload_source: st
 def log_response_not_found(method: str, path: str) -> None:
     """
     Log unmatched request (404 response).
-    
+
     Args:
         method: HTTP method
         path: Request path
@@ -80,7 +82,7 @@ def log_response_not_found(method: str, path: str) -> None:
     console.print()
     console.print("-" * 70, style="dim cyan")
     console.print()
-    
+
     console.print(f"Response: 404 (no match for {method} {path})", style="bright_red")
     console.print("...", style="dim yellow", end="")
 
@@ -93,7 +95,7 @@ def log_response_sent() -> None:
 def log_server_startup(port: int, config_file: str, endpoint_count: int) -> None:
     """
     Log server startup information.
-    
+
     Args:
         port: Server port
         config_file: Configuration file path
@@ -107,7 +109,7 @@ def log_server_startup(port: int, config_file: str, endpoint_count: int) -> None
     console.print(f"Config:      {config_file}", style="blue")
     console.print(f"Endpoints:   {endpoint_count}", style="blue")
     console.print("=" * 70, style="bright_blue")
-    console.print("Press Ctrl+C to stop", style="dim blue")
+    console.print("Press Ctrl+C to stop", style="blue")
     console.print()
 
 
@@ -119,21 +121,10 @@ def log_server_shutdown() -> None:
     console.print("=" * 70, style="bright_blue")
 
 
-def log_delay_start(delay_ms: int) -> None:
-    """
-    Log delay start message.
-    
-    Args:
-        delay_ms: Delay duration in milliseconds
-    """
-    # No longer logging delay start - delay info shown in response summary only
-    pass
-
-
 def _print_json_payload(data: Any) -> None:
     """
     Pretty-print JSON data with syntax highlighting.
-    
+
     Args:
         data: JSON-serializable data to print
     """
@@ -149,10 +140,10 @@ def _print_json_payload(data: Any) -> None:
 def format_payload_source(endpoint) -> str:
     """
     Format payload source description for logging.
-    
+
     Args:
         endpoint: Endpoint configuration object
-        
+
     Returns:
         Formatted payload source string
     """
