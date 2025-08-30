@@ -87,17 +87,17 @@ def load_config(config_path: str) -> Config:
                 config_data = json.load(f)
         except json.JSONDecodeError as e:
             print(f"Error: Invalid JSON in configuration file: {e}")
-            raise SystemExit(1)
+            raise SystemExit(1) from e
         except Exception as e:
             print(f"Error: Could not read configuration file: {e}")
-            raise SystemExit(1)
+            raise SystemExit(1) from e
 
         # Validate configuration structure
         try:
             config = Config(**config_data)
         except Exception as e:
             print(f"Error: Invalid configuration: {e}")
-            raise SystemExit(1)
+            raise SystemExit(1) from e
 
         # Validate payload files exist
         _validate_payload_files(config)
@@ -105,10 +105,10 @@ def load_config(config_path: str) -> Config:
         return config
 
     except SystemExit:
-        raise
+        raise  # pylint: disable=try-except-raise
     except Exception as e:
         print(f"Error: Unexpected error loading configuration: {e}")
-        raise SystemExit(1)
+        raise SystemExit(1) from e
 
 
 def _validate_payload_files(config: Config) -> None:
@@ -153,7 +153,7 @@ def load_payload_file(file_path: str) -> Dict[str, Any]:
             return json.load(f)
     except json.JSONDecodeError as e:
         print(f"Error: Invalid JSON in payload file {file_path}: {e}")
-        raise SystemExit(1)
+        raise SystemExit(1) from e
     except Exception as e:
         print(f"Error: Could not read payload file {file_path}: {e}")
-        raise SystemExit(1)
+        raise SystemExit(1) from e

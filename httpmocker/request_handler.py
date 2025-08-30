@@ -3,8 +3,8 @@ from typing import Dict, Any
 from bottle import Bottle, request, response
 from .config_loader import Config, Endpoint, load_payload_file
 from .console_formatter import (
-    log_request_received, 
-    log_response_matched, 
+    log_request_received,
+    log_response_matched,
     log_response_not_found,
     log_response_sent,
     format_payload_source

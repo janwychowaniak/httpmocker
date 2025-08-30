@@ -94,8 +94,8 @@ def main():
         sys.exit(0)
     except SystemExit:
         # Re-raise SystemExit from config loading
-        raise
-    except Exception as e:
+        raise  # pylint: disable=try-except-raise
+    except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"Error: Unexpected error: {e}")
         sys.exit(1)
 
