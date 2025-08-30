@@ -28,6 +28,12 @@ def parse_arguments():
         help="Path to JSON configuration file"
     )
 
+    parser.add_argument(
+        "--validate-config",
+        action="store_true",
+        help="Validate configuration file and exit (don't start server). Example: httpmocker -p 8080 -c config.json --validate-config"
+    )
+
     return parser.parse_args()
 
 
@@ -55,11 +61,18 @@ def main():
         # Parse command line arguments
         args = parse_arguments()
 
-        # Check if port is available
-        check_port_available(args.port)
-
         # Load and validate configuration
         config = load_config(args.config)
+
+        # If only validating config, exit after successful validation
+        if args.validate_config:
+            print(f"✓ Configuration file '{args.config}' is valid")
+            print(f"✓ Found {len(config.endpoints)} endpoint(s)")
+            print("✓ All payload files exist")
+            return
+
+        # Check if port is available
+        check_port_available(args.port)
 
         # Create Bottle application
         app = create_app(config)
