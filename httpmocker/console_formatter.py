@@ -64,7 +64,9 @@ def log_response_matched(method: str, path: str, status: int, payload_source: st
     console.print(f"Response: {method} {path}", style="bright_green")
     console.print(f" - status:         {status}", style="green")
     console.print(f" - {payload_source}", style="green")
-    console.print(f" - delay_ms:       {delay_ms}", style="green")
+    if delay_ms > 0:
+        console.print(f" - delay_ms:       {delay_ms}", style="green")
+    console.print("...", style="dim yellow", end="")
 
 
 def log_response_not_found(method: str, path: str) -> None:
@@ -80,6 +82,12 @@ def log_response_not_found(method: str, path: str) -> None:
     console.print()
     
     console.print(f"Response: 404 (no match for {method} {path})", style="bright_red")
+    console.print("...", style="dim yellow", end="")
+
+
+def log_response_sent() -> None:
+    """Log that response has been sent successfully."""
+    console.print("sent", style="bright_green")
 
 
 def log_server_startup(port: int, config_file: str, endpoint_count: int) -> None:
@@ -118,8 +126,8 @@ def log_delay_start(delay_ms: int) -> None:
     Args:
         delay_ms: Delay duration in milliseconds
     """
-    if delay_ms > 0:
-        console.print(f"Delaying response by {delay_ms}ms...", style="dim yellow")
+    # No longer logging delay start - delay info shown in response summary only
+    pass
 
 
 def _print_json_payload(data: Any) -> None:

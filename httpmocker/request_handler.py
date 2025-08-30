@@ -7,6 +7,7 @@ from .console_formatter import (
     log_response_matched, 
     log_response_not_found,
     log_delay_start,
+    log_response_sent,
     format_payload_source
 )
 
@@ -93,9 +94,14 @@ def _handle_matched_endpoint(endpoint: Endpoint) -> Dict[str, Any]:
     
     # Get payload
     if endpoint.payload_inline is not None:
-        return endpoint.payload_inline
+        payload = endpoint.payload_inline
     else:
-        return load_payload_file(endpoint.payload_file)
+        payload = load_payload_file(endpoint.payload_file)
+    
+    # Log that response is being sent
+    log_response_sent()
+    
+    return payload
 
 
 def _handle_unmatched_request(method: str, path: str) -> Dict[str, str]:
@@ -113,6 +119,9 @@ def _handle_unmatched_request(method: str, path: str) -> Dict[str, str]:
     
     response.status = 404
     response.content_type = 'application/json'
+    
+    # Log that response is being sent
+    log_response_sent()
     
     return {"error": "endpoint not found"}
 
