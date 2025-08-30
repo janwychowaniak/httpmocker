@@ -39,6 +39,28 @@ python -m httpmocker -p <port> -c <config_file>
 **Options:**
 - `-p, --port`: HTTP server port (required)
 - `-c, --config`: Path to JSON configuration file (required)
+- `--validate-config`: Validate configuration file and exit (don't start server)
+
+### Configuration Validation
+
+You can validate your configuration file without starting the server:
+
+```bash
+python -m httpmocker -p 8080 -c config.json --validate-config
+```
+
+This will:
+- Parse and validate the JSON structure
+- Check all endpoint configurations
+- Verify that all payload files exist
+- Display a summary and exit
+
+Example output:
+```
+✓ Configuration file 'config.json' is valid
+✓ Found 6 endpoint(s)
+✓ All payload files exist
+```
 
 ## Configuration Format
 
@@ -151,6 +173,7 @@ Response: GET /api/users
  - status:         200
  - payload_inline: {"users": [...]}
  - delay_ms:       100
+...sent
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Connection received on localhost 59393
@@ -162,6 +185,7 @@ Accept:      */*
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 Response: 404 (no match for POST /api/nonexistent)
+...sent
 ```
 
 ## Behavior Details
@@ -254,18 +278,33 @@ Create different configuration files for various testing scenarios:
 ### Requirements
 
 - Python 3.8+
-- bottle
-- pydantic
+- bottle==0.13.4
+- pydantic==2.11.7
+- rich==14.1.0
 
 ### Running Tests
 
 ```bash
-# Test with curl
+# Install development dependencies
+pip install -r requirements-dev.txt
+
+# Run unit tests
+python -m pytest tests/ -v
+
+# Validate configuration
+python -m httpmocker -p 8080 -c config_example.json --validate-config
+```
+
+### Manual Testing
+
+```bash
+# Start the mock server
 python -m httpmocker -p 8080 -c config_example.json
 
-# In another terminal
+# In another terminal, test with curl
 curl -X GET http://localhost:8080/api/users
 curl -X POST http://localhost:8080/api/login -d '{"username":"test"}'
+curl -X GET http://localhost:8080/health
 ```
 
 ## Contributing
