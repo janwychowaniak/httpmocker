@@ -273,6 +273,83 @@ Create different configuration files for various testing scenarios:
 - `config.error.json` - Error scenario testing
 - `config.performance.json` - High-latency simulation
 
+## Docker Usage
+
+### Building the Image
+
+```bash
+docker build -t httpmocker:latest .
+```
+
+### Running with Docker
+
+**Basic usage:**
+```bash
+docker run --name httpmocker-instance -p 8080:8080 \
+  -v $(pwd)/config.json:/app/config.json:ro \
+  -v $(pwd)/payloads:/app/payloads:ro \
+  httpmocker:latest
+```
+
+**With custom network (for testing containerized apps):**
+```bash
+# Create a network
+docker network create testing
+
+# Run httpmocker on the network
+docker run --name httpmocker --network testing \
+  -v $(pwd)/config.json:/app/config.json:ro \
+  -v $(pwd)/payloads:/app/payloads:ro \
+  httpmocker:latest
+
+# Run your app on the same network
+docker run --network testing \
+  -e API_BASE_URL=http://httpmocker:8080 \
+  myapp:latest
+```
+
+**Using Docker Compose:**
+```bash
+# Copy the example compose file
+cp docker-compose.example.yml docker-compose.yml
+
+# Edit docker-compose.yml to add your services
+# Then run:
+docker-compose up
+```
+
+### Docker Examples
+
+**Testing a web application:**
+```bash
+# Start httpmocker
+docker run -d --name api-mock \
+  -p 8080:8080 \
+  -v $(pwd)/config.json:/app/config.json:ro \
+  -v $(pwd)/payloads:/app/payloads:ro \
+  httpmocker:latest
+
+# Test your app against the mock
+curl http://localhost:8080/api/users
+```
+
+**Sidecar pattern with custom network:**
+```bash
+# Create network
+docker network create myapp-test
+
+# Start mock service
+docker run -d --name mock-api --network myapp-test \
+  -v $(pwd)/test-config.json:/app/config.json:ro \
+  -v $(pwd)/test-payloads:/app/payloads:ro \
+  httpmocker:latest
+
+# Start your application
+docker run --network myapp-test \
+  -e API_URL=http://mock-api:8080 \
+  myapp:test
+```
+
 ## Development
 
 ### Requirements
@@ -297,6 +374,7 @@ python -m httpmocker -p 8080 -c config_example.json --validate-config
 
 ### Manual Testing
 
+**Local development:**
 ```bash
 # Start the mock server
 python -m httpmocker -p 8080 -c config_example.json
@@ -305,6 +383,19 @@ python -m httpmocker -p 8080 -c config_example.json
 curl -X GET http://localhost:8080/api/users
 curl -X POST http://localhost:8080/api/login -d '{"username":"test"}'
 curl -X GET http://localhost:8080/health
+```
+
+**Docker development:**
+```bash
+# Validate locally before containerizing
+python -m httpmocker -p 8080 -c config.json --validate-config
+
+# Build and test the Docker image
+docker build -t httpmocker:latest .
+docker run --name httpmocker-dev -p 8080:8080 \
+  -v $(pwd)/config_example.json:/app/config.json:ro \
+  -v $(pwd)/payloads:/app/payloads:ro \
+  httpmocker:latest
 ```
 
 ## Contributing

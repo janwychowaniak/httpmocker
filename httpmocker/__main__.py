@@ -49,7 +49,7 @@ def check_port_available(port: int) -> None:
     """
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.bind(('localhost', port))
+            sock.bind(('0.0.0.0', port))
     except OSError:
         print(f"Error: Port {port} already in use")
         sys.exit(1)
@@ -84,7 +84,7 @@ def main():
         try:
             run(
                 app,
-                host='localhost',
+                host='0.0.0.0',
                 port=args.port,
                 quiet=True  # Suppress Bottle's default logging
             )

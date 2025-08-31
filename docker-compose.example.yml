@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  httpmocker:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ./payloads:/app/payloads:ro
+    networks:
+      - testing
+
+  # Example: Your application under test
+  # myapp:
+  #   image: myapp:latest
+  #   depends_on:
+  #     - httpmocker
+  #   environment:
+  #     - API_BASE_URL=http://httpmocker:8080
+  #   networks:
+  #     - testing
+
+networks:
+  testing:
+    driver: bridge
