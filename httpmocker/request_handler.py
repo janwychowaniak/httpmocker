@@ -90,7 +90,6 @@ def _handle_matched_endpoint(endpoint: Endpoint) -> Union[Dict[str, Any], str]:
 
     # Set response status
     response.status = endpoint.status
-    response.content_type = 'application/json'
 
     # Get payload
     if endpoint.payload_inline is not None:
@@ -98,11 +97,24 @@ def _handle_matched_endpoint(endpoint: Endpoint) -> Union[Dict[str, Any], str]:
     else:
         payload = load_payload_file(endpoint.payload_file)
 
-    # Log that response is being sent
-    log_response_sent()
-
-    # Return JSON string for proper handling of both dicts and lists
-    return json.dumps(payload, ensure_ascii=False)
+    # Handle HTTP semantics properly
+    if endpoint.status == 204:
+        # 204 No Content should not have Content-Type or body
+        log_response_sent()
+        return ""
+    elif request.method == "HEAD":
+        # HEAD should return same headers as GET but no body
+        response.content_type = 'application/json'
+        json_payload = json.dumps(payload, ensure_ascii=False)
+        # Set Content-Length to what the body would be, but return empty body
+        response.headers['Content-Length'] = str(len(json_payload.encode('utf-8')))
+        log_response_sent()
+        return ""
+    else:
+        # Normal response with JSON content
+        response.content_type = 'application/json'
+        log_response_sent()
+        return json.dumps(payload, ensure_ascii=False)
 
 
 def _handle_unmatched_request(method: str, path: str) -> Dict[str, str]:
