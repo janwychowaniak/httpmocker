@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -135,7 +135,7 @@ def _validate_payload_files(config: Config) -> None:
         raise SystemExit(1)
 
 
-def load_payload_file(file_path: str) -> Dict[str, Any]:
+def load_payload_file(file_path: str) -> Union[Dict[str, Any], list]:
     """
     Load JSON payload from file.
     

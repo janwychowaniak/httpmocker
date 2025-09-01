@@ -57,6 +57,20 @@
       "status": 204,
       "payload_inline": {},
       "delay_ms": 50
+    },
+    {
+      "method": "GET",
+      "path": "/api/some-urls",
+      "status": 200,
+      "payload_file": "payloads/urls_list.json",
+      "delay_ms": 75
+    },
+    {
+      "method": "HEAD",
+      "path": "/api/users",
+      "status": 200,
+      "payload_inline": {},
+      "delay_ms": 25
     }
   ]
 }

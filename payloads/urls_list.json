@@ -1,0 +1,7 @@
+[
+  {"url": "https://api.example.com/v1/data"},
+  {"url": "https://service.test.org/endpoint"},
+  {"url": "https://mock.demo.net/api/users"},
+  {"url": "https://sample.localhost:3000/health"},
+  {"url": "https://placeholder.dev/api/status"}
+]

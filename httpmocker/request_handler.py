@@ -1,5 +1,6 @@
 import time
-from typing import Dict, Any
+import json
+from typing import Dict, Any, Union
 from bottle import Bottle, request, response
 from .config_loader import Config, Endpoint, load_payload_file
 from .console_formatter import (
@@ -68,7 +69,7 @@ def create_app(config: Config) -> Bottle:
     return app
 
 
-def _handle_matched_endpoint(endpoint: Endpoint) -> Dict[str, Any]:
+def _handle_matched_endpoint(endpoint: Endpoint) -> Union[Dict[str, Any], str]:
     """
     Handle matched endpoint request.
 
@@ -100,7 +101,8 @@ def _handle_matched_endpoint(endpoint: Endpoint) -> Dict[str, Any]:
     # Log that response is being sent
     log_response_sent()
 
-    return payload
+    # Return JSON string for proper handling of both dicts and lists
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def _handle_unmatched_request(method: str, path: str) -> Dict[str, str]:
