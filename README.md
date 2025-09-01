@@ -7,7 +7,7 @@ A standalone server that serves predefined responses based on request method and
 
 - **Standalone HTTP server** - runs as CLI application on configurable port
 - **Static configuration** - JSON-based endpoint-to-response mapping
-- **Flexible payloads** - supports both inline JSON and external payload files
+- **Flexible payloads** - supports both inline JSON and external payload files (objects and arrays)
 - **Configurable delays** - simulate network latency per endpoint
 - **Detailed logging** - verbose console output showing all requests and responses
 - **Graceful shutdown** - handles Ctrl+C with immediate termination
@@ -112,9 +112,9 @@ Use _either_ `payload_inline` for simple JSON objects _or_ `payload_file` for co
 
 ## Example Payloads
 
-Create payload files in the `payloads/` directory:
+Create payload files in the `payloads/` directory. httpmocker supports both JSON objects and JSON arrays as top-level responses:
 
-**payloads/login_error.json:**
+**JSON Object Response (payloads/login_error.json):**
 
 ```json
 {
@@ -124,7 +124,17 @@ Create payload files in the `payloads/` directory:
 }
 ```
 
-**payloads/user_list.json:**
+**JSON Array Response (payloads/urls_list.json):**
+
+```json
+[
+  {"url": "https://api.example.com/v1/data"},
+  {"url": "https://service.test.org/endpoint"},
+  {"url": "https://mock.demo.net/api/users"}
+]
+```
+
+**Complex JSON Object (payloads/user_list.json):**
 
 ```json
 {
@@ -199,7 +209,11 @@ Response: 404 (no match for POST /api/nonexistent)
 
 ### Response Behavior
 
-- **Content-Type**: Automatically set to `application/json` for all responses
+- **Content-Type**: Automatically set to `application/json` for responses with content
+- **JSON Support**: Both JSON objects `{}` and JSON arrays `[]` are supported as top-level responses
+- **HTTP Semantics**: 
+  - `204 No Content` responses omit Content-Type header and have empty body
+  - `HEAD` requests return same headers as corresponding GET but with no response body
 - **Unmatched requests**: Return HTTP 404 with `{"error": "endpoint not found"}`
 - **Missing payload files**: Application crashes with error description (attention to config correctness forced intentionally)
 - **Delays**: Implemented as interruptible sleep, can be terminated with Ctrl+C
@@ -243,6 +257,48 @@ httpmocker/
         "retry_after": 30
       },
       "delay_ms": 5000
+    }
+  ]
+}
+```
+
+### Testing Collection APIs
+
+```json
+{
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/suspicious-urls",
+      "status": 200,
+      "payload_inline": [
+        {"url": "https://malicious.example.com"},
+        {"url": "https://phishing.test.org"}
+      ],
+      "delay_ms": 100
+    }
+  ]
+}
+```
+
+### Testing HEAD Requests
+
+```json
+{
+  "endpoints": [
+    {
+      "method": "HEAD",
+      "path": "/api/resource-check",
+      "status": 200,
+      "payload_inline": {},
+      "delay_ms": 0
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/sessions",
+      "status": 204,
+      "payload_inline": {},
+      "delay_ms": 50
     }
   ]
 }
