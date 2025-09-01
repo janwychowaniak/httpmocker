@@ -28,7 +28,7 @@ def log_request_received(request: BaseRequest, client_address: str) -> None:
 
     # Headers
     for header_name, header_value in request.headers.items():
-        console.print(f"{header_name:<12} {header_value}", style="white")
+        console.print(f"{header_name:<18} {header_value}", style="white")
 
     # Request body (if present)
     if hasattr(request, 'json') and request.json:
