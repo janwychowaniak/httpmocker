@@ -60,6 +60,23 @@ ruff check . --fix
 ruff format .
 ```
 
+### Pre-commit Hooks
+
+```bash
+# Install hooks once (runs ruff lint+format and basic hygiene on each commit)
+pip install pre-commit
+pre-commit install
+
+# Run all hooks against the whole tree
+pre-commit run --all-files
+```
+
+### Continuous Integration
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and on
+pull requests: a lint/format job (`ruff check` + `ruff format --check`) and a
+test job across Python 3.10–3.13.
+
 ## Architecture
 
 ### Core Components
