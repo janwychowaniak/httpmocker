@@ -161,7 +161,6 @@ curl -I http://localhost:8080/api/users  # HEAD request
 Development dependencies (requirements-dev.txt):
 - **pytest==8.3.5**: Testing framework
 - **pylint==3.3.7**: Code linting
-- **code2flow==2.5.1**: Code visualization
 
 ## File Structure
 

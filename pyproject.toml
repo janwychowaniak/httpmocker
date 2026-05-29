@@ -38,11 +38,6 @@ dev = [
     "pytest>=8.3",
     "pylint>=3.3",
 ]
-# Optional code-visualization tooling, kept separate because it is not part of
-# the test/lint workflow and currently fails to build on modern setuptools.
-graph = [
-    "code2flow>=2.5",
-]
 
 [project.scripts]
 httpmocker = "httpmocker.__main__:main"
