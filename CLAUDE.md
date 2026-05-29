@@ -24,8 +24,8 @@ python -m httpmocker -p 8080 -c config.json --validate-config
 ### Testing
 
 ```bash
-# Install development dependencies
-pip install -r requirements-dev.txt
+# Install the package with development dependencies
+pip install -e ".[dev]"
 
 # Run all tests (coverage is collected automatically; see pyproject.toml)
 python -m pytest tests/ -v
@@ -181,13 +181,16 @@ curl -I http://localhost:8080/api/users  # HEAD request
 
 ## Dependencies
 
-- **bottle==0.13.4**: Lightweight WSGI web framework
-- **pydantic==2.11.7**: Data validation and settings management
-- **rich==14.1.0**: Rich terminal formatting and colors
+All dependencies are declared in `pyproject.toml`, the single source of truth.
 
-Development dependencies (requirements-dev.txt):
-- **pytest==8.3.5**: Testing framework
-- **ruff==0.9.6**: Linting and formatting
+Runtime (`[project.dependencies]`):
+- **bottle**: Lightweight WSGI web framework
+- **pydantic**: Data validation and settings management
+- **rich**: Rich terminal formatting and colors
+
+Development (`[project.optional-dependencies].dev`, installed via `pip install -e ".[dev]"`):
+- **pytest** / **pytest-cov**: Testing framework and coverage
+- **ruff** (pinned): Linting and formatting
 
 ## File Structure
 
@@ -208,7 +211,7 @@ httpmocker/
 │   ├── example.json
 │   └── urls_list.json
 ├── config_example.json      # Example configuration
-├── requirements.txt         # Production dependencies
-├── requirements-dev.txt     # Development dependencies
-└── Dockerfile              # Container image
+├── pyproject.toml           # Packaging, dependencies & tooling config
+├── CHANGELOG.md             # Notable changes
+└── Dockerfile               # Container image
 ```

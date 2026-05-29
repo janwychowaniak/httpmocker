@@ -20,8 +20,11 @@ A standalone server that serves predefined responses based on request method and
 ```bash
 git clone https://github.com/janwychowaniak/httpmocker.git
 cd httpmocker
-pip install -r requirements.txt
+pip install .
 ```
+
+This installs the `httpmocker` command along with its dependencies. After
+installation you can invoke it as `httpmocker` (or `python -m httpmocker`).
 
 ## Quick Start
 
@@ -239,7 +242,8 @@ httpmocker/
 ├── payloads/                 # Directory for payload files
 │   └── example.json
 ├── README.md
-├── requirements.txt
+├── CHANGELOG.md               # Notable changes
+├── pyproject.toml             # Packaging, dependencies and tooling config
 └── LICENSE
 ```
 
@@ -413,9 +417,8 @@ docker run --network myapp-test \
 ### Requirements
 
 - Python 3.10+
-- bottle==0.13.4
-- pydantic==2.11.7
-- rich==14.1.0
+- Runtime dependencies (bottle, pydantic, rich) are declared in `pyproject.toml`
+  and installed automatically by `pip install .`
 
 ### Running Tests
 
