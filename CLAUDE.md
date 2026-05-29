@@ -47,11 +47,17 @@ docker run --name httpmocker-instance -p 8080:8080 \
   httpmocker:latest
 ```
 
-### Linting
+### Linting & Formatting
 
 ```bash
-# Run pylint on the codebase
-pylint httpmocker/
+# Lint the codebase
+ruff check .
+
+# Auto-fix lint issues
+ruff check . --fix
+
+# Format the codebase
+ruff format .
 ```
 
 ## Architecture
@@ -160,7 +166,7 @@ curl -I http://localhost:8080/api/users  # HEAD request
 
 Development dependencies (requirements-dev.txt):
 - **pytest==8.3.5**: Testing framework
-- **pylint==3.3.7**: Code linting
+- **ruff==0.9.6**: Linting and formatting
 
 ## File Structure
 

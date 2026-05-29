@@ -1,21 +1,23 @@
 import json
 import os
-from typing import Dict, Any, Optional, Union
-from pydantic import BaseModel, Field, field_validator
+from typing import Any
 
+from pydantic import BaseModel, Field, field_validator
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+
 class Endpoint(BaseModel):
     """Configuration model for a single API endpoint."""
+
     method: str = Field(..., description="HTTP method (case-sensitive, uppercase)")
     path: str = Field(..., description="Exact path to match")
     status: int = Field(..., description="HTTP status code to return")
     delay_ms: int = Field(..., description="Response delay in milliseconds")
-    payload_inline: Optional[Dict[str, Any]] = Field(None, description="Inline JSON payload")
-    payload_file: Optional[str] = Field(None, description="Path to external payload file")
+    payload_inline: dict[str, Any] | None = Field(None, description="Inline JSON payload")
+    payload_file: str | None = Field(None, description="Path to external payload file")
 
-    @field_validator('method')
+    @field_validator("method")
     @classmethod
     def validate_method(cls, v):
         """Ensure HTTP method is uppercase."""
@@ -23,7 +25,7 @@ class Endpoint(BaseModel):
             raise ValueError(f"HTTP method must be uppercase, got: {v}")
         return v
 
-    @field_validator('status')
+    @field_validator("status")
     @classmethod
     def validate_status(cls, v):
         """Ensure status code is valid HTTP status."""
@@ -31,7 +33,7 @@ class Endpoint(BaseModel):
             raise ValueError(f"HTTP status code must be between 100-599, got: {v}")
         return v
 
-    @field_validator('delay_ms')
+    @field_validator("delay_ms")
     @classmethod
     def validate_delay(cls, v):
         """Ensure delay is non-negative."""
@@ -53,9 +55,10 @@ class Endpoint(BaseModel):
 
 class Config(BaseModel):
     """Configuration model for the entire application."""
+
     endpoints: list[Endpoint] = Field(..., description="List of endpoint configurations")
 
-    @field_validator('endpoints')
+    @field_validator("endpoints")
     @classmethod
     def validate_endpoints_not_empty(cls, v):
         """Ensure at least one endpoint is configured."""
@@ -66,10 +69,11 @@ class Config(BaseModel):
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+
 def load_config(config_path: str) -> Config:
     """
     Load and validate configuration from JSON file.
-    
+
     Args:
         config_path: Path to the configuration JSON file
 
@@ -87,7 +91,7 @@ def load_config(config_path: str) -> Config:
 
         # Load and parse JSON
         try:
-            with open(config_path, 'r', encoding='utf-8') as f:
+            with open(config_path, encoding="utf-8") as f:
                 config_data = json.load(f)
         except json.JSONDecodeError as e:
             print(f"Error: Invalid JSON in configuration file: {e}")
@@ -109,7 +113,7 @@ def load_config(config_path: str) -> Config:
         return config
 
     except SystemExit:
-        raise  # pylint: disable=try-except-raise
+        raise
     except Exception as e:
         print(f"Error: Unexpected error loading configuration: {e}")
         raise SystemExit(1) from e
@@ -118,7 +122,7 @@ def load_config(config_path: str) -> Config:
 def _validate_payload_files(config: Config) -> None:
     """
     Validate that all referenced payload files exist.
-    
+
     Args:
         config: Validated configuration object
 
@@ -128,9 +132,8 @@ def _validate_payload_files(config: Config) -> None:
     missing_files = []
 
     for endpoint in config.endpoints:
-        if endpoint.payload_file:
-            if not os.path.exists(endpoint.payload_file):
-                missing_files.append(endpoint.payload_file)
+        if endpoint.payload_file and not os.path.exists(endpoint.payload_file):
+            missing_files.append(endpoint.payload_file)
 
     if missing_files:
         print("Error: Missing payload files:")
@@ -139,10 +142,10 @@ def _validate_payload_files(config: Config) -> None:
         raise SystemExit(1)
 
 
-def load_payload_file(file_path: str) -> Union[Dict[str, Any], list]:
+def load_payload_file(file_path: str) -> dict[str, Any] | list:
     """
     Load JSON payload from file.
-    
+
     Args:
         file_path: Path to the payload JSON file
 
@@ -153,7 +156,7 @@ def load_payload_file(file_path: str) -> Union[Dict[str, Any], list]:
         SystemExit: On file loading or JSON parsing errors
     """
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, encoding="utf-8") as f:
             return json.load(f)
     except json.JSONDecodeError as e:
         print(f"Error: Invalid JSON in payload file {file_path}: {e}")

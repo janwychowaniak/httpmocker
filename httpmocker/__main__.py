@@ -1,39 +1,33 @@
 import argparse
-import sys
 import socket
-from bottle import run
-from .config_loader import load_config
-from .request_handler import create_app
-from .console_formatter import log_server_startup, log_server_shutdown
+import sys
 
+from bottle import run
+
+from .config_loader import load_config
+from .console_formatter import log_server_shutdown, log_server_startup
+from .request_handler import create_app
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="Simple HTTP REST API mocker for integration and end-to-end testing",
-        prog="httpmocker"
+        prog="httpmocker",
     )
 
-    parser.add_argument(
-        "-p", "--port",
-        type=int,
-        required=True,
-        help="HTTP server port"
-    )
+    parser.add_argument("-p", "--port", type=int, required=True, help="HTTP server port")
 
     parser.add_argument(
-        "-c", "--config",
-        type=str,
-        required=True,
-        help="Path to JSON configuration file"
+        "-c", "--config", type=str, required=True, help="Path to JSON configuration file"
     )
 
     parser.add_argument(
         "--validate-config",
         action="store_true",
-        help="Validate configuration file and exit (don't start server). Example: httpmocker -p 8080 -c config.json --validate-config"
+        help="Validate configuration file and exit (don't start server). Example: httpmocker -p 8080 -c config.json --validate-config",
     )
 
     return parser.parse_args()
@@ -51,13 +45,14 @@ def check_port_available(port: int) -> None:
     """
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.bind(('0.0.0.0', port))
+            sock.bind(("0.0.0.0", port))
     except OSError:
         print(f"Error: Port {port} already in use")
         sys.exit(1)
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
 def main():
     """Main entry point for httpmocker CLI application."""
@@ -88,9 +83,9 @@ def main():
         try:
             run(
                 app,
-                host='0.0.0.0',
+                host="0.0.0.0",
                 port=args.port,
-                quiet=True  # Suppress Bottle's default logging
+                quiet=True,  # Suppress Bottle's default logging
             )
         except KeyboardInterrupt:
             pass  # Graceful shutdown
@@ -111,8 +106,8 @@ def main():
         sys.exit(0)
     except SystemExit:
         # Re-raise SystemExit from config loading
-        raise  # pylint: disable=try-except-raise
-    except Exception as e:  # pylint: disable=broad-exception-caught
+        raise
+    except Exception as e:
         print(f"Error: Unexpected error: {e}")
         sys.exit(1)
 

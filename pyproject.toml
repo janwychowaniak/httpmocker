@@ -36,7 +36,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3",
-    "pylint>=3.3",
+    "ruff>=0.9",
 ]
 
 [project.scripts]
@@ -46,6 +46,26 @@ httpmocker = "httpmocker.__main__:main"
 Homepage = "https://github.com/janwychowaniak/httpmocker"
 Repository = "https://github.com/janwychowaniak/httpmocker"
 Issues = "https://github.com/janwychowaniak/httpmocker/issues"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "SIM",  # flake8-simplify
+    "RET",  # flake8-return
+]
+# The formatter owns line length; long string literals it cannot wrap should not
+# be flagged as lint errors.
+ignore = ["E501"]
 
 [tool.hatch.version]
 path = "httpmocker/__init__.py"

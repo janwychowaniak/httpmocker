@@ -1,18 +1,20 @@
-import time
 import json
-from typing import Dict, Any, Union
+import time
+from typing import Any
+
 from bottle import Bottle, request, response
+
 from .config_loader import Config, Endpoint, load_payload_file
 from .console_formatter import (
+    format_payload_source,
     log_request_received,
     log_response_matched,
     log_response_not_found,
     log_response_sent,
-    format_payload_source
 )
 
-
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
 def create_app(config: Config) -> Bottle:
     """
@@ -32,7 +34,7 @@ def create_app(config: Config) -> Bottle:
         key = (endpoint.method, endpoint.path)
         endpoint_map[key] = endpoint
 
-    @app.route('/<path:path>', method=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'])
+    @app.route("/<path:path>", method=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
     def handle_request(path):
         """Handle all HTTP requests and match against configured endpoints."""
         # Reconstruct full path with leading slash
@@ -50,11 +52,10 @@ def create_app(config: Config) -> Bottle:
 
         if endpoint:
             return _handle_matched_endpoint(endpoint)
-        else:
-            return _handle_unmatched_request(request.method, full_path)
+        return _handle_unmatched_request(request.method, full_path)
 
     # Handle root path separately
-    @app.route('/', method=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'])
+    @app.route("/", method=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
     def handle_root():
         """Handle requests to root path."""
         client_address = f"{request.environ.get('REMOTE_ADDR', 'unknown')}:{request.environ.get('REMOTE_PORT', 'unknown')}"
@@ -65,13 +66,12 @@ def create_app(config: Config) -> Bottle:
 
         if endpoint:
             return _handle_matched_endpoint(endpoint)
-        else:
-            return _handle_unmatched_request(request.method, "/")
+        return _handle_unmatched_request(request.method, "/")
 
     return app
 
 
-def _handle_matched_endpoint(endpoint: Endpoint) -> Union[Dict[str, Any], str]:
+def _handle_matched_endpoint(endpoint: Endpoint) -> dict[str, Any] | str:
     """
     Handle matched endpoint request.
 
@@ -83,8 +83,9 @@ def _handle_matched_endpoint(endpoint: Endpoint) -> Union[Dict[str, Any], str]:
     """
     # Log successful match
     payload_source = format_payload_source(endpoint)
-    log_response_matched(endpoint.method, endpoint.path, endpoint.status,
-                         payload_source, endpoint.delay_ms)
+    log_response_matched(
+        endpoint.method, endpoint.path, endpoint.status, payload_source, endpoint.delay_ms
+    )
 
     # Apply delay if configured
     if endpoint.delay_ms > 0:
@@ -104,22 +105,21 @@ def _handle_matched_endpoint(endpoint: Endpoint) -> Union[Dict[str, Any], str]:
         # 204 No Content should not have Content-Type or body
         log_response_sent()
         return ""
-    elif request.method == "HEAD":
+    if request.method == "HEAD":
         # HEAD should return same headers as GET but no body
-        response.content_type = 'application/json'
+        response.content_type = "application/json"
         json_payload = json.dumps(payload, ensure_ascii=False)
         # Set Content-Length to what the body would be, but return empty body
-        response.headers['Content-Length'] = str(len(json_payload.encode('utf-8')))
+        response.headers["Content-Length"] = str(len(json_payload.encode("utf-8")))
         log_response_sent()
         return ""
-    else:
-        # Normal response with JSON content
-        response.content_type = 'application/json'
-        log_response_sent()
-        return json.dumps(payload, ensure_ascii=False)
+    # Normal response with JSON content
+    response.content_type = "application/json"
+    log_response_sent()
+    return json.dumps(payload, ensure_ascii=False)
 
 
-def _handle_unmatched_request(method: str, path: str) -> Dict[str, str]:
+def _handle_unmatched_request(method: str, path: str) -> dict[str, str]:
     """
     Handle unmatched request (404).
 
@@ -133,7 +133,7 @@ def _handle_unmatched_request(method: str, path: str) -> Dict[str, str]:
     log_response_not_found(method, path)
 
     response.status = 404
-    response.content_type = 'application/json'
+    response.content_type = "application/json"
 
     # Log that response is being sent
     log_response_sent()

@@ -1,15 +1,16 @@
 import json
 from typing import Any
+
+from bottle import BaseRequest
 from rich.console import Console
 from rich.syntax import Syntax
-from bottle import BaseRequest
-
 
 # Initialize Rich console for colored output
 console = Console()
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
 def log_request_received(request: BaseRequest, client_address: str) -> None:
     """
@@ -33,24 +34,25 @@ def log_request_received(request: BaseRequest, client_address: str) -> None:
         console.print(f"{header_name:<18} {header_value}", style="white")
 
     # Request body (if present)
-    if hasattr(request, 'json') and request.json:
+    if hasattr(request, "json") and request.json:
         console.print()  # Empty line
         _print_json_payload(request.json)
     elif request.body.read():
         console.print()  # Empty line
         try:
             # Try to parse as JSON for pretty printing
-            body_data = json.loads(request.body.read().decode('utf-8'))
+            body_data = json.loads(request.body.read().decode("utf-8"))
             _print_json_payload(body_data)
         except (json.JSONDecodeError, UnicodeDecodeError):
             # If not JSON, print as plain text
-            console.print(request.body.read().decode('utf-8', errors='replace'), style="dim white")
+            console.print(request.body.read().decode("utf-8", errors="replace"), style="dim white")
         # Reset body stream for potential re-reading
         request.body.seek(0)
 
 
-def log_response_matched(method: str, path: str, status: int,
-                         payload_source: str, delay_ms: int) -> None:
+def log_response_matched(
+    method: str, path: str, status: int, payload_source: str, delay_ms: int
+) -> None:
     """
     Log successful endpoint match and response details.
 
@@ -151,9 +153,8 @@ def format_payload_source(endpoint) -> str:
     """
     if endpoint.payload_inline is not None:
         # Show truncated inline payload for brevity
-        payload_str = json.dumps(endpoint.payload_inline, separators=(',', ':'))
+        payload_str = json.dumps(endpoint.payload_inline, separators=(",", ":"))
         if len(payload_str) > 50:
             payload_str = payload_str[:47] + "..."
         return f"payload_inline: {payload_str}"
-    else:
-        return f"payload_file:   {endpoint.payload_file}"
+    return f"payload_file:   {endpoint.payload_file}"
