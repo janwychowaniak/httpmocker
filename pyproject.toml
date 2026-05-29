@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "httpmocker"
+dynamic = ["version"]
+description = "Simple HTTP REST API mocker for integration and end-to-end testing"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Jan Wychowaniak" },
+]
+keywords = ["http", "mock", "testing", "rest", "api", "integration-testing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Software Development :: Testing :: Mocking",
+    "Topic :: Internet :: WWW/HTTP",
+]
+dependencies = [
+    "bottle>=0.13.4",
+    "pydantic>=2.11",
+    "rich>=14.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pylint>=3.3",
+]
+# Optional code-visualization tooling, kept separate because it is not part of
+# the test/lint workflow and currently fails to build on modern setuptools.
+graph = [
+    "code2flow>=2.5",
+]
+
+[project.scripts]
+httpmocker = "httpmocker.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/janwychowaniak/httpmocker"
+Repository = "https://github.com/janwychowaniak/httpmocker"
+Issues = "https://github.com/janwychowaniak/httpmocker/issues"
+
+[tool.hatch.version]
+path = "httpmocker/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["httpmocker"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/httpmocker",
+    "/tests",
+    "/payloads",
+    "/config_example.json",
+    "/README.md",
+    "/LICENSE",
+]
