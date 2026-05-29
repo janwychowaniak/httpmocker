@@ -9,6 +9,8 @@ from bottle import BaseRequest
 console = Console()
 
 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 def log_request_received(request: BaseRequest, client_address: str) -> None:
     """
     Log incoming HTTP request with full details.

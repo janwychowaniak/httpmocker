@@ -7,6 +7,8 @@ from .request_handler import create_app
 from .console_formatter import log_server_startup, log_server_shutdown
 
 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
@@ -54,6 +56,8 @@ def check_port_available(port: int) -> None:
         print(f"Error: Port {port} already in use")
         sys.exit(1)
 
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def main():
     """Main entry point for httpmocker CLI application."""

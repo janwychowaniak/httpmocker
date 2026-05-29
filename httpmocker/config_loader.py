@@ -4,6 +4,8 @@ from typing import Dict, Any, Optional, Union
 from pydantic import BaseModel, Field, field_validator
 
 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 class Endpoint(BaseModel):
     """Configuration model for a single API endpoint."""
     method: str = Field(..., description="HTTP method (case-sensitive, uppercase)")
@@ -61,6 +63,8 @@ class Config(BaseModel):
             raise ValueError("At least one endpoint must be configured")
         return v
 
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def load_config(config_path: str) -> Config:
     """

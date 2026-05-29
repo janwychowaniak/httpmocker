@@ -12,6 +12,8 @@ from .console_formatter import (
 )
 
 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 def create_app(config: Config) -> Bottle:
     """
     Create and configure Bottle application with endpoints.
