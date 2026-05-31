@@ -1,6 +1,6 @@
 # Pinned by digest for reproducible, tamper-evident builds. The tag is kept
 # in the comment for readability; Dependabot's docker ecosystem updates both.
-FROM python:3.12-slim@sha256:090ba77e2958f6af52a5341f788b50b032dd4ca28377d2893dcf1ecbdfdfe203
+FROM python:3.14.5-slim@sha256:c845af9399020c7e562969a13689e929074a10fd057acd1b1fad06a2fb068e97
 
 # Set working directory
 WORKDIR /app
