@@ -27,6 +27,21 @@ jobs:
       - name: Mypy
         run: mypy httpmocker/
 
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+      # Audit the project's resolved runtime dependency tree (not the dev
+      # toolchain), so the gate reflects what actually ships.
+      - name: pip-audit
+        run: pip-audit .
+
   test:
     name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
