@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ruff as the linter and formatter, configured in `pyproject.toml`.
 - Static type checking with mypy (`strict`, pydantic plugin), wired into
   pre-commit and CI, plus a `py.typed` marker so the package ships its types.
+- Dependabot configuration for the GitHub Actions, pip, and Docker
+  ecosystems, with grouped updates and a release cooldown.
 - GitHub Actions CI (lint/format plus tests on Python 3.10–3.13) and
   pre-commit hooks.
 - Test suites for the request handler, console formatter, and CLI, plus
