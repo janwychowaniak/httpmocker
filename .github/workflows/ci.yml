@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   lint:
-    name: Lint & format
+    name: Lint, format & types
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +24,8 @@ jobs:
         run: ruff check --output-format=github .
       - name: Ruff format check
         run: ruff format --check .
+      - name: Mypy
+        run: mypy httpmocker/
 
   test:
     name: Test (Python ${{ matrix.python-version }})

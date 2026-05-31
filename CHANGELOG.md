@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `httpmocker` console entry point, and a single source of truth for the
   version (`httpmocker.__version__`).
 - Ruff as the linter and formatter, configured in `pyproject.toml`.
+- Static type checking with mypy (`strict`, pydantic plugin), wired into
+  pre-commit and CI, plus a `py.typed` marker so the package ships its types.
 - GitHub Actions CI (lint/format plus tests on Python 3.10–3.13) and
   pre-commit hooks.
 - Test suites for the request handler, console formatter, and CLI, plus

@@ -5,6 +5,8 @@ from bottle import BaseRequest
 from rich.console import Console
 from rich.syntax import Syntax
 
+from .config_loader import Endpoint
+
 # Initialize Rich console for colored output
 console = Console()
 
@@ -141,7 +143,7 @@ def _print_json_payload(data: Any) -> None:
         console.print(str(data), style="dim white")
 
 
-def format_payload_source(endpoint) -> str:
+def format_payload_source(endpoint: Endpoint) -> str:
     """
     Format payload source description for logging.
 

@@ -11,7 +11,7 @@ from .request_handler import create_app
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="Simple HTTP REST API mocker for integration and end-to-end testing",
@@ -54,7 +54,7 @@ def check_port_available(port: int) -> None:
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-def main():
+def main() -> None:
     """Main entry point for httpmocker CLI application."""
     try:
         # Parse command line arguments
