@@ -20,8 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   coverage reporting (`pytest-cov`, `fail_under = 85`).
 - `HEALTHCHECK` in the Docker image to verify the server port is accepting
   connections.
-- Dependabot configuration for the GitHub Actions, pip, and Docker
-  ecosystems, with grouped updates and a release cooldown.
+- Dependabot configuration for the GitHub Actions, uv, and Docker
+  ecosystems, with grouped updates and a release cooldown. The native uv
+  ecosystem keeps `pyproject.toml` and `uv.lock` in sync in the same PR.
 - `pip-audit` dependency vulnerability scan in CI (auditing the resolved
   runtime dependency tree), plus `pip-audit` in the `[dev]` extra.
 - Trivy image scan in CI that builds the Docker image and fails on fixable

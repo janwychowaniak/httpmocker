@@ -20,7 +20,10 @@ updates:
       - "github-actions"
 
   # Python dependencies declared in pyproject.toml (runtime + the dev extra).
-  - package-ecosystem: "pip"
+  # The native "uv" ecosystem understands both pyproject.toml and uv.lock and
+  # regenerates the lockfile in the same PR, keeping the two in sync. (The
+  # "pip" ecosystem would update pyproject.toml but leave uv.lock stale.)
+  - package-ecosystem: "uv"
     directory: "/"
     schedule:
       interval: "weekly"
