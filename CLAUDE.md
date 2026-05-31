@@ -24,15 +24,19 @@ python -m httpmocker -p 8080 -c config.json --validate-config
 ### Testing
 
 ```bash
-# Install development dependencies
-pip install -r requirements-dev.txt
+# Install the package with development dependencies
+pip install -e ".[dev]"
 
-# Run all tests
+# Run all tests (coverage is collected automatically; see pyproject.toml)
 python -m pytest tests/ -v
 
 # Run specific test file
 python -m pytest tests/test_config_loader.py -v
 ```
+
+Coverage is configured in `pyproject.toml` (`--cov=httpmocker`, term-missing
+report, `fail_under = 85`). The suite is dependency-free: the WSGI app is driven
+directly via a small in-test client, so no extra web-test framework is needed.
 
 ### Docker
 
@@ -47,12 +51,35 @@ docker run --name httpmocker-instance -p 8080:8080 \
   httpmocker:latest
 ```
 
-### Linting
+### Linting & Formatting
 
 ```bash
-# Run pylint on the codebase
-pylint httpmocker/
+# Lint the codebase
+ruff check .
+
+# Auto-fix lint issues
+ruff check . --fix
+
+# Format the codebase
+ruff format .
 ```
+
+### Pre-commit Hooks
+
+```bash
+# Install hooks once (runs ruff lint+format and basic hygiene on each commit)
+pip install pre-commit
+pre-commit install
+
+# Run all hooks against the whole tree
+pre-commit run --all-files
+```
+
+### Continuous Integration
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and on
+pull requests: a lint/format job (`ruff check` + `ruff format --check`) and a
+test job across Python 3.10–3.13.
 
 ## Architecture
 
@@ -122,11 +149,11 @@ Each endpoint in `config.json` requires:
 
 ### Testing Philosophy
 
-The codebase includes comprehensive unit tests in `tests/test_config_loader.py`:
-- Pydantic validation tests for all edge cases
-- Configuration loading with valid/invalid JSON
-- Payload file validation
-- Edge cases: zero delays, complex paths, multiple endpoints
+The codebase includes comprehensive unit tests organized by module:
+- `tests/test_config_loader.py` - Pydantic validation, config loading (valid/invalid JSON), payload file validation, and edge cases (zero delays, complex paths, multiple endpoints)
+- `tests/test_request_handler.py` - the WSGI app: endpoint matching, method/status handling, HTTP semantics (204, HEAD), payload files (object/array), and delays
+- `tests/test_console_formatter.py` - payload-source formatting, request/response logging, and lifecycle banners
+- `tests/test_main.py` - CLI argument parsing, port-availability checks, and the `--validate-config` path
 
 When adding features, follow the existing test structure with descriptive docstrings and organized test classes.
 
@@ -154,14 +181,16 @@ curl -I http://localhost:8080/api/users  # HEAD request
 
 ## Dependencies
 
-- **bottle==0.13.4**: Lightweight WSGI web framework
-- **pydantic==2.11.7**: Data validation and settings management
-- **rich==14.1.0**: Rich terminal formatting and colors
+All dependencies are declared in `pyproject.toml`, the single source of truth.
 
-Development dependencies (requirements-dev.txt):
-- **pytest==8.3.5**: Testing framework
-- **pylint==3.3.7**: Code linting
-- **code2flow==2.5.1**: Code visualization
+Runtime (`[project.dependencies]`):
+- **bottle**: Lightweight WSGI web framework
+- **pydantic**: Data validation and settings management
+- **rich**: Rich terminal formatting and colors
+
+Development (`[project.optional-dependencies].dev`, installed via `pip install -e ".[dev]"`):
+- **pytest** / **pytest-cov**: Testing framework and coverage
+- **ruff** (pinned): Linting and formatting
 
 ## File Structure
 
@@ -174,12 +203,15 @@ httpmocker/
 │   ├── request_handler.py   # HTTP handling & routing
 │   └── console_formatter.py # Logging & output
 ├── tests/                   # Unit tests
-│   └── test_config_loader.py
+│   ├── test_config_loader.py
+│   ├── test_request_handler.py
+│   ├── test_console_formatter.py
+│   └── test_main.py
 ├── payloads/                # External payload files
 │   ├── example.json
 │   └── urls_list.json
 ├── config_example.json      # Example configuration
-├── requirements.txt         # Production dependencies
-├── requirements-dev.txt     # Development dependencies
-└── Dockerfile              # Container image
+├── pyproject.toml           # Packaging, dependencies & tooling config
+├── CHANGELOG.md             # Notable changes
+└── Dockerfile               # Container image
 ```

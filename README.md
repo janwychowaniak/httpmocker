@@ -1,5 +1,7 @@
 # httpmocker
 
+[![CI](https://github.com/janwychowaniak/httpmocker/actions/workflows/ci.yml/badge.svg)](https://github.com/janwychowaniak/httpmocker/actions/workflows/ci.yml)
+
 Simple HTTP REST API mocker for integration and end-to-end testing.
 A standalone server that serves predefined responses based on request method and path configuration.
 
@@ -18,8 +20,11 @@ A standalone server that serves predefined responses based on request method and
 ```bash
 git clone https://github.com/janwychowaniak/httpmocker.git
 cd httpmocker
-pip install -r requirements.txt
+pip install .
 ```
+
+This installs the `httpmocker` command along with its dependencies. After
+installation you can invoke it as `httpmocker` (or `python -m httpmocker`).
 
 ## Quick Start
 
@@ -148,7 +153,7 @@ Create payload files in the `payloads/` directory. httpmocker supports both JSON
     {
       "id": 2,
       "username": "user1",
-      "email": "user1@example.com", 
+      "email": "user1@example.com",
       "role": "user"
     }
   ],
@@ -211,7 +216,7 @@ Response: 404 (no match for POST /api/nonexistent)
 
 - **Content-Type**: Automatically set to `application/json` for responses with content
 - **JSON Support**: Both JSON objects `{}` and JSON arrays `[]` are supported as top-level responses
-- **HTTP Semantics**: 
+- **HTTP Semantics**:
   - `204 No Content` responses omit Content-Type header and have empty body
   - `HEAD` requests return same headers as corresponding GET but with no response body
 - **Unmatched requests**: Return HTTP 404 with `{"error": "endpoint not found"}`
@@ -230,14 +235,15 @@ httpmocker/
 ├── config_example.json       # Example configuration file
 ├── httpmocker/
 │   ├── __init__.py
-│   ├── __main__.py           # CLI entry point  
+│   ├── __main__.py           # CLI entry point
 │   ├── config_loader.py      # Configuration parsing and validation
 │   ├── request_handler.py    # HTTP request processing
 │   └── console_formatter.py  # Output formatting
 ├── payloads/                 # Directory for payload files
 │   └── example.json
 ├── README.md
-├── requirements.txt
+├── CHANGELOG.md               # Notable changes
+├── pyproject.toml             # Packaging, dependencies and tooling config
 └── LICENSE
 ```
 
@@ -310,7 +316,7 @@ httpmocker/
 {
   "endpoints": [
     {
-      "method": "GET", 
+      "method": "GET",
       "path": "/api/reports/heavy",
       "status": 200,
       "payload_file": "payloads/large_report.json",
@@ -325,7 +331,7 @@ httpmocker/
 Create different configuration files for various testing scenarios:
 
 - `config.dev.json` - Development API responses
-- `config.staging.json` - Staging environment simulation  
+- `config.staging.json` - Staging environment simulation
 - `config.error.json` - Error scenario testing
 - `config.performance.json` - High-latency simulation
 
@@ -410,22 +416,41 @@ docker run --network myapp-test \
 
 ### Requirements
 
-- Python 3.8+
-- bottle==0.13.4
-- pydantic==2.11.7
-- rich==14.1.0
+- Python 3.10+
+- Runtime dependencies (bottle, pydantic, rich) are declared in `pyproject.toml`
+  and installed automatically by `pip install .`
 
 ### Running Tests
 
 ```bash
 # Install development dependencies
-pip install -r requirements-dev.txt
+pip install -e ".[dev]"
 
 # Run unit tests
 python -m pytest tests/ -v
 
 # Validate configuration
 python -m httpmocker -p 8080 -c config_example.json --validate-config
+```
+
+### Linting & Formatting
+
+```bash
+ruff check .          # lint
+ruff check . --fix    # lint + autofix
+ruff format .         # format
+```
+
+### Pre-commit Hooks
+
+Install the git hooks once so linting and formatting run automatically on every commit:
+
+```bash
+pip install pre-commit
+pre-commit install
+
+# Optional: run all hooks against the whole tree
+pre-commit run --all-files
 ```
 
 ### Manual Testing

@@ -46,11 +46,10 @@ venv.bak/
 htmlcov/
 
 # Development files
-requirements-dev.txt
 tests/
 
 # Documentation
-README.md
+# NOTE: README.md is required at build time (referenced by pyproject metadata).
 LICENSE
 
 # Example files (users will mount their own)
@@ -70,4 +69,3 @@ docker-compose.example.yml
 .aider.input.history
 .aider.tags.cache.v4
 .aider*
-__graphs__/
