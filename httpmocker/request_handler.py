@@ -29,13 +29,13 @@ def create_app(config: Config) -> Bottle:
     app = Bottle()
 
     # Create endpoint lookup dictionary for fast matching
-    endpoint_map = {}
+    endpoint_map: dict[tuple[str, str], Endpoint] = {}
     for endpoint in config.endpoints:
         key = (endpoint.method, endpoint.path)
         endpoint_map[key] = endpoint
 
     @app.route("/<path:path>", method=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
-    def handle_request(path):
+    def handle_request(path: str) -> dict[str, Any] | str:
         """Handle all HTTP requests and match against configured endpoints."""
         # Reconstruct full path with leading slash
         full_path = f"/{path}" if path else "/"
@@ -56,7 +56,7 @@ def create_app(config: Config) -> Bottle:
 
     # Handle root path separately
     @app.route("/", method=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
-    def handle_root():
+    def handle_root() -> dict[str, Any] | str:
         """Handle requests to root path."""
         client_address = f"{request.environ.get('REMOTE_ADDR', 'unknown')}:{request.environ.get('REMOTE_PORT', 'unknown')}"
         log_request_received(request, client_address)
@@ -94,10 +94,12 @@ def _handle_matched_endpoint(endpoint: Endpoint) -> dict[str, Any] | str:
     # Set response status
     response.status = endpoint.status
 
-    # Get payload
+    # Get payload (exactly one source is guaranteed by Endpoint validation)
+    payload: dict[str, Any] | list[Any]
     if endpoint.payload_inline is not None:
         payload = endpoint.payload_inline
     else:
+        assert endpoint.payload_file is not None
         payload = load_payload_file(endpoint.payload_file)
 
     # Handle HTTP semantics properly

@@ -20,3 +20,15 @@ repos:
         args: [--fix]
       # Run the formatter.
       - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.19.1
+    hooks:
+      - id: mypy
+        # Type-check only the package; tests are not under strict typing.
+        files: ^httpmocker/
+        # mypy needs the typed runtime deps available to resolve their stubs
+        # and to load the pydantic mypy plugin.
+        additional_dependencies:
+          - pydantic>=2.11
+          - rich>=14.0

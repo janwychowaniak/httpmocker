@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -19,7 +19,7 @@ class Endpoint(BaseModel):
 
     @field_validator("method")
     @classmethod
-    def validate_method(cls, v):
+    def validate_method(cls, v: str) -> str:
         """Ensure HTTP method is uppercase."""
         if not v.isupper():
             raise ValueError(f"HTTP method must be uppercase, got: {v}")
@@ -27,7 +27,7 @@ class Endpoint(BaseModel):
 
     @field_validator("status")
     @classmethod
-    def validate_status(cls, v):
+    def validate_status(cls, v: int) -> int:
         """Ensure status code is valid HTTP status."""
         if not 100 <= v <= 599:
             raise ValueError(f"HTTP status code must be between 100-599, got: {v}")
@@ -35,13 +35,13 @@ class Endpoint(BaseModel):
 
     @field_validator("delay_ms")
     @classmethod
-    def validate_delay(cls, v):
+    def validate_delay(cls, v: int) -> int:
         """Ensure delay is non-negative."""
         if v < 0:
             raise ValueError(f"Delay must be non-negative, got: {v}")
         return v
 
-    def __init__(self, **data):
+    def __init__(self, **data: Any) -> None:
         super().__init__(**data)
         # Ensure exactly one payload type is specified
         has_inline = self.payload_inline is not None
@@ -60,7 +60,7 @@ class Config(BaseModel):
 
     @field_validator("endpoints")
     @classmethod
-    def validate_endpoints_not_empty(cls, v):
+    def validate_endpoints_not_empty(cls, v: list[Endpoint]) -> list[Endpoint]:
         """Ensure at least one endpoint is configured."""
         if not v:
             raise ValueError("At least one endpoint must be configured")
@@ -129,7 +129,7 @@ def _validate_payload_files(config: Config) -> None:
     Raises:
         SystemExit: If any payload file is missing
     """
-    missing_files = []
+    missing_files: list[str] = []
 
     for endpoint in config.endpoints:
         if endpoint.payload_file and not os.path.exists(endpoint.payload_file):
@@ -142,7 +142,7 @@ def _validate_payload_files(config: Config) -> None:
         raise SystemExit(1)
 
 
-def load_payload_file(file_path: str) -> dict[str, Any] | list:
+def load_payload_file(file_path: str) -> dict[str, Any] | list[Any]:
     """
     Load JSON payload from file.
 
@@ -157,7 +157,7 @@ def load_payload_file(file_path: str) -> dict[str, Any] | list:
     """
     try:
         with open(file_path, encoding="utf-8") as f:
-            return json.load(f)
+            return cast("dict[str, Any] | list[Any]", json.load(f))
     except json.JSONDecodeError as e:
         print(f"Error: Invalid JSON in payload file {file_path}: {e}")
         raise SystemExit(1) from e

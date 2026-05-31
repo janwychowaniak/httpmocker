@@ -1,0 +1,52 @@
+version: 2
+
+updates:
+  # GitHub Actions used in workflows. Pinned to commit SHAs (see ci.yml);
+  # Dependabot updates the SHA and the human-readable version comment together.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Wait for a release to settle before opening a PR, reducing churn from
+    # quickly-superseded or yanked releases.
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "github-actions"
+
+  # Python dependencies declared in pyproject.toml (runtime + the dev extra).
+  # The native "uv" ecosystem understands both pyproject.toml and uv.lock and
+  # regenerates the lockfile in the same PR, keeping the two in sync. (The
+  # "pip" ecosystem would update pyproject.toml but leave uv.lock stale.)
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      # Routine patch/minor bumps land in a single PR to keep noise down;
+      # majors stay separate so they can be reviewed individually.
+      python-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    labels:
+      - "dependencies"
+      - "python"
+
+  # Base image in the Dockerfile.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    labels:
+      - "dependencies"
+      - "docker"
