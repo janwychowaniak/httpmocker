@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ecosystems, with grouped updates and a release cooldown.
 - `pip-audit` dependency vulnerability scan in CI (auditing the resolved
   runtime dependency tree), plus `pip-audit` in the `[dev]` extra.
+- Trivy image scan in CI that builds the Docker image and fails on fixable
+  HIGH/CRITICAL vulnerabilities.
 - This changelog.
 
 ### Changed
