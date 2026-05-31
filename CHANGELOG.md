@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pre-commit and CI, plus a `py.typed` marker so the package ships its types.
 - Dependabot configuration for the GitHub Actions, pip, and Docker
   ecosystems, with grouped updates and a release cooldown.
+
+### Changed
+- Pinned GitHub Actions in CI to full commit SHAs (with version comments)
+  instead of mutable tags, to harden the workflow against tag-movement
+  supply-chain attacks. Dependabot keeps the SHAs and comments updated.
 - GitHub Actions CI (lint/format plus tests on Python 3.10–3.13) and
   pre-commit hooks.
 - Test suites for the request handler, console formatter, and CLI, plus
