@@ -64,6 +64,17 @@ ruff check . --fix
 ruff format .
 ```
 
+### Type Checking
+
+```bash
+# Static type check the package (strict mode, configured in pyproject.toml)
+mypy httpmocker/
+```
+
+The package is fully type-annotated and ships a `py.typed` marker. mypy runs in
+`strict` mode with the pydantic plugin; `bottle` has no type information, so its
+import is exempted via a per-module override in `pyproject.toml`.
+
 ### Pre-commit Hooks
 
 ```bash
@@ -78,7 +89,8 @@ pre-commit run --all-files
 ### Continuous Integration
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and on
-pull requests: a lint/format job (`ruff check` + `ruff format --check`) and a
+pull requests: a lint/format/types job (`ruff check` + `ruff format --check` +
+`mypy`), a dependency-audit job (`pip-audit`), a Docker image scan (Trivy), and a
 test job across Python 3.10–3.13.
 
 ## Architecture
@@ -191,6 +203,12 @@ Runtime (`[project.dependencies]`):
 Development (`[project.optional-dependencies].dev`, installed via `pip install -e ".[dev]"`):
 - **pytest** / **pytest-cov**: Testing framework and coverage
 - **ruff** (pinned): Linting and formatting
+- **mypy**: Static type checking (strict, with the pydantic plugin)
+- **pip-audit**: Dependency vulnerability scanning
+
+`uv.lock` pins the fully-resolved dependency graph (with hashes) for
+reproducible installs via `uv sync`. It is generated from `pyproject.toml`;
+regenerate it with `uv lock` whenever the declared dependencies change.
 
 ## File Structure
 

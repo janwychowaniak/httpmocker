@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runtime dependency tree), plus `pip-audit` in the `[dev]` extra.
 - Trivy image scan in CI that builds the Docker image and fails on fixable
   HIGH/CRITICAL vulnerabilities.
+- `uv.lock` for reproducible, fully-pinned dependency resolution with
+  hashes (`pyproject.toml` remains the source of truth for version ranges).
 - This changelog.
 
 ### Changed
