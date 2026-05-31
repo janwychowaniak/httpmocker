@@ -26,8 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runtime dependency tree), plus `pip-audit` in the `[dev]` extra.
 - Trivy image scan in CI that builds the Docker image and fails on fixable
   HIGH/CRITICAL vulnerabilities.
-- Codecov coverage upload from the CI test matrix and CI/coverage badges in
-  the README.
 - This changelog.
 
 ### Changed
