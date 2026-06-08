@@ -9,10 +9,10 @@ A standalone server that serves predefined responses based on request method and
 
 - **Standalone HTTP server** - runs as CLI application on configurable port
 - **Static configuration** - JSON-based endpoint-to-response mapping
-- **Flexible payloads** - supports both inline JSON and external payload files (objects and arrays)
+- **Flexible payloads** - inline JSON objects, or external payload files (JSON objects or arrays)
 - **Configurable delays** - simulate network latency per endpoint
 - **Detailed logging** - verbose console output showing all requests and responses
-- **Graceful shutdown** - handles Ctrl+C with immediate termination
+- **Graceful shutdown** - handles Ctrl+C cleanly, interrupting any in-flight response delay
 - **Exact matching** - precise method+path matching for predictable behavior
 
 ## Installation
@@ -63,7 +63,7 @@ This will:
 Example output:
 ```
 ✓ Configuration file 'config.json' is valid
-✓ Found 6 endpoint(s)
+✓ Found 8 endpoint(s)
 ✓ All payload files exist
 ```
 
@@ -135,7 +135,9 @@ Create payload files in the `payloads/` directory. httpmocker supports both JSON
 [
   {"url": "https://api.example.com/v1/data"},
   {"url": "https://service.test.org/endpoint"},
-  {"url": "https://mock.demo.net/api/users"}
+  {"url": "https://mock.demo.net/api/users"},
+  {"url": "https://sample.localhost:3000/health"},
+  {"url": "https://placeholder.dev/api/status"}
 ]
 ```
 
@@ -168,36 +170,41 @@ httpmocker provides detailed logging of all requests and responses:
 
 ```
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Connection received on localhost 59392
+
+Connection received on localhost 127.0.0.1:unknown
 GET /api/users?filter=active HTTP/1.1
-Host:        localhost:8080
-User-Agent:  curl/7.81.0
-Accept:      */*
-X-Client:    test-suite
+Content-Length     54
+Content-Type       application/json
+Host               127.0.0.1:8080
+User-Agent         curl/8.5.0
+Accept             */*
+X-Client           test-suite
 
 {
-    "filter_criteria": {
-        "status": "active",
-        "limit": 10
-    }
+  "filter_criteria": {
+    "status": "active",
+    "limit": 10
+  }
 }
 
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+----------------------------------------------------------------------
 
 Response: GET /api/users
  - status:         200
- - payload_inline: {"users": [...]}
- - delay_ms:       100
+ - payload_file:   payloads/example.json
+ - delay_ms:       150
 ...sent
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Connection received on localhost 59393
-POST /api/nonexistent HTTP/1.1
-Host:        localhost:8080
-User-Agent:  curl/7.81.0
-Accept:      */*
 
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Connection received on localhost 127.0.0.1:unknown
+POST /api/nonexistent HTTP/1.1
+Content-Type       text/plain
+Host               127.0.0.1:8080
+User-Agent         curl/8.5.0
+Accept             */*
+
+----------------------------------------------------------------------
 
 Response: 404 (no match for POST /api/nonexistent)
 ...sent
@@ -232,19 +239,37 @@ Bottle automatically decodes URL-encoded paths, so configure paths in decoded fo
 
 ```
 httpmocker/
-├── config_example.json       # Example configuration file
-├── httpmocker/
-│   ├── __init__.py
-│   ├── __main__.py           # CLI entry point
-│   ├── config_loader.py      # Configuration parsing and validation
-│   ├── request_handler.py    # HTTP request processing
-│   └── console_formatter.py  # Output formatting
-├── payloads/                 # Directory for payload files
-│   └── example.json
-├── README.md
-├── CHANGELOG.md               # Notable changes
-├── pyproject.toml             # Packaging, dependencies and tooling config
-└── LICENSE
+├── httpmocker/                  # Main package
+│   ├── __init__.py             # Package metadata & version
+│   ├── __main__.py             # CLI entry point
+│   ├── config_loader.py        # Configuration parsing & validation
+│   ├── request_handler.py      # HTTP request processing & routing
+│   ├── console_formatter.py    # Console logging & output
+│   └── py.typed                # PEP 561 typing marker
+├── tests/                      # Unit tests
+│   ├── test_config_loader.py
+│   ├── test_request_handler.py
+│   ├── test_console_formatter.py
+│   └── test_main.py
+├── payloads/                   # External payload files
+│   ├── example.json
+│   └── urls_list.json
+├── .github/                    # CI & automation
+│   ├── workflows/
+│   │   └── ci.yml              # Lint/format/types, audit, Docker scan, tests
+│   └── dependabot.yml          # Grouped dependency updates
+├── config_example.json         # Example configuration
+├── docker-compose.example.yml  # Example Docker Compose setup
+├── Dockerfile                  # Container image
+├── .dockerignore               # Docker build-context exclusions
+├── .pre-commit-config.yaml     # Pre-commit hooks (ruff lint+format, mypy, hygiene)
+├── pyproject.toml              # Packaging, dependencies & tooling config
+├── uv.lock                     # Fully-pinned dependency lockfile
+├── .gitignore
+├── CHANGELOG.md                # Notable changes
+├── README.md                   # User-facing documentation
+├── CLAUDE.md                   # Guidance for Claude Code
+└── LICENSE                     # MIT license
 ```
 
 ## Example Use Cases
@@ -277,15 +302,14 @@ httpmocker/
       "method": "GET",
       "path": "/api/suspicious-urls",
       "status": 200,
-      "payload_inline": [
-        {"url": "https://malicious.example.com"},
-        {"url": "https://phishing.test.org"}
-      ],
+      "payload_file": "payloads/suspicious_urls.json",
       "delay_ms": 100
     }
   ]
 }
 ```
+
+Top-level JSON arrays must be served from a `payload_file` — `payload_inline` accepts JSON objects only.
 
 ### Testing HEAD Requests
 
@@ -441,9 +465,15 @@ ruff check . --fix    # lint + autofix
 ruff format .         # format
 ```
 
+### Type Checking
+
+```bash
+mypy httpmocker/      # static type check (strict mode)
+```
+
 ### Pre-commit Hooks
 
-Install the git hooks once so linting and formatting run automatically on every commit:
+Install the git hooks once so linting, formatting, and type checking run automatically on every commit:
 
 ```bash
 pip install pre-commit

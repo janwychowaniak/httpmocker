@@ -91,7 +91,7 @@ pre-commit run --all-files
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and on
 pull requests: a lint/format/types job (`ruff check` + `ruff format --check` +
 `mypy`), a dependency-audit job (`pip-audit`), a Docker image scan (Trivy), and a
-test job across Python 3.10–3.13.
+test job across Python 3.10–3.14.
 
 ## Architecture
 
@@ -214,22 +214,35 @@ regenerate it with `uv lock` whenever the declared dependencies change.
 
 ```
 httpmocker/
-├── httpmocker/               # Main package
-│   ├── __init__.py
-│   ├── __main__.py          # Entry point
-│   ├── config_loader.py     # Configuration & validation
-│   ├── request_handler.py   # HTTP handling & routing
-│   └── console_formatter.py # Logging & output
-├── tests/                   # Unit tests
+├── httpmocker/                  # Main package
+│   ├── __init__.py             # Package metadata & version
+│   ├── __main__.py             # CLI entry point
+│   ├── config_loader.py        # Configuration & validation
+│   ├── request_handler.py      # HTTP handling & routing
+│   ├── console_formatter.py    # Logging & output
+│   └── py.typed                # PEP 561 typing marker
+├── tests/                      # Unit tests
 │   ├── test_config_loader.py
 │   ├── test_request_handler.py
 │   ├── test_console_formatter.py
 │   └── test_main.py
-├── payloads/                # External payload files
+├── payloads/                   # External payload files
 │   ├── example.json
 │   └── urls_list.json
-├── config_example.json      # Example configuration
-├── pyproject.toml           # Packaging, dependencies & tooling config
-├── CHANGELOG.md             # Notable changes
-└── Dockerfile               # Container image
+├── .github/                    # CI & automation
+│   ├── workflows/
+│   │   └── ci.yml              # Lint/format/types, audit, Docker scan, tests
+│   └── dependabot.yml          # Grouped dependency updates
+├── config_example.json         # Example configuration
+├── docker-compose.example.yml  # Example Docker Compose setup
+├── Dockerfile                  # Container image
+├── .dockerignore               # Docker build-context exclusions
+├── .pre-commit-config.yaml     # Pre-commit hooks (ruff lint+format, mypy, hygiene)
+├── pyproject.toml              # Packaging, dependencies & tooling config
+├── uv.lock                     # Fully-pinned dependency lockfile
+├── .gitignore
+├── CHANGELOG.md                # Notable changes
+├── README.md                   # User-facing documentation
+├── CLAUDE.md                   # Guidance for Claude Code
+└── LICENSE                     # MIT license
 ```
