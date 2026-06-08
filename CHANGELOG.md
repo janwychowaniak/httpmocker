@@ -52,3 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `requirements.txt` and `requirements-dev.txt`, superseded by `pyproject.toml`
   and its `[dev]` extra.
 - The `code2flow` development dependency.
+
+### Fixed
+- Request logs now show the client's source port instead of `host:unknown`.
+  The default `wsgiref` server does not populate `REMOTE_PORT`, so a custom
+  WSGI request handler now exposes the client port to the application.

@@ -171,7 +171,7 @@ httpmocker provides detailed logging of all requests and responses:
 ```
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Connection received on localhost 127.0.0.1:unknown
+Connection received on localhost 127.0.0.1:51616
 GET /api/users?filter=active HTTP/1.1
 Content-Length     54
 Content-Type       application/json
@@ -197,7 +197,7 @@ Response: GET /api/users
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Connection received on localhost 127.0.0.1:unknown
+Connection received on localhost 127.0.0.1:51632
 POST /api/nonexistent HTTP/1.1
 Content-Type       text/plain
 Host               127.0.0.1:8080

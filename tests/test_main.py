@@ -6,10 +6,17 @@ availability checking, and the --validate-config path of main().
 
 import json
 import socket
+from wsgiref.simple_server import WSGIRequestHandler
 
 import pytest
 
-from httpmocker.__main__ import check_port_available, main, parse_arguments
+from httpmocker.__main__ import (
+    ClientPortRequestHandler,
+    _inject_remote_port,
+    check_port_available,
+    main,
+    parse_arguments,
+)
 
 
 def write_config(tmp_path, endpoints):
@@ -102,3 +109,33 @@ class TestMainValidateConfig:
         with pytest.raises(SystemExit) as exc_info:
             main()
         assert exc_info.value.code == 1
+
+
+class TestClientPortHandler:
+    """The custom WSGI handler exposes the client's source port (wsgiref does not)."""
+
+    def test_inject_remote_port_adds_port(self):
+        environ = {"REMOTE_ADDR": "203.0.113.7"}
+        result = _inject_remote_port(environ, ("203.0.113.7", 49152))
+        assert result["REMOTE_PORT"] == "49152"
+        assert result["REMOTE_ADDR"] == "203.0.113.7"
+
+    def test_get_environ_includes_client_port(self, monkeypatch):
+        monkeypatch.setattr(
+            WSGIRequestHandler, "get_environ", lambda self: {"REMOTE_ADDR": "203.0.113.7"}
+        )
+        handler = object.__new__(ClientPortRequestHandler)
+        handler.client_address = ("203.0.113.7", 49152)
+        env = handler.get_environ()
+        assert env["REMOTE_ADDR"] == "203.0.113.7"
+        assert env["REMOTE_PORT"] == "49152"
+
+    def test_address_string_skips_reverse_dns(self):
+        handler = object.__new__(ClientPortRequestHandler)
+        handler.client_address = ("203.0.113.7", 49152)
+        assert handler.address_string() == "203.0.113.7"
+
+    def test_log_request_is_silent(self, capsys):
+        handler = object.__new__(ClientPortRequestHandler)
+        handler.log_request(200, 123)
+        assert capsys.readouterr().out == ""

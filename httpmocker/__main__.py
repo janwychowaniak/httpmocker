@@ -1,6 +1,8 @@
 import argparse
 import socket
 import sys
+from typing import Any
+from wsgiref.simple_server import WSGIRequestHandler
 
 from bottle import run
 
@@ -54,6 +56,37 @@ def check_port_available(port: int) -> None:
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
+def _inject_remote_port(environ: dict[str, Any], client_address: tuple[str, int]) -> dict[str, Any]:
+    """Expose the client's source port to the WSGI app.
+
+    The stdlib ``wsgiref`` server populates ``REMOTE_ADDR`` but not
+    ``REMOTE_PORT``, so without this the request log shows ``host:unknown``.
+    """
+    environ["REMOTE_PORT"] = str(client_address[1])
+    return environ
+
+
+class ClientPortRequestHandler(WSGIRequestHandler):
+    """WSGI request handler that adds the client port to the environ.
+
+    It also skips reverse-DNS lookups and silences the default request log
+    (the app does its own request logging), mirroring Bottle's built-in
+    ``FixedHandler``.
+    """
+
+    def get_environ(self) -> dict[str, Any]:
+        return _inject_remote_port(super().get_environ(), self.client_address)
+
+    def address_string(self) -> str:
+        return str(self.client_address[0])
+
+    def log_request(self, *args: Any, **kwargs: Any) -> None:
+        pass
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
 def main() -> None:
     """Main entry point for httpmocker CLI application."""
     try:
@@ -86,6 +119,7 @@ def main() -> None:
                 host="0.0.0.0",
                 port=args.port,
                 quiet=True,  # Suppress Bottle's default logging
+                handler_class=ClientPortRequestHandler,
             )
         except KeyboardInterrupt:
             pass  # Graceful shutdown
