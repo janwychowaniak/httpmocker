@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ruff as the linter and formatter, configured in `pyproject.toml`.
 - Static type checking with mypy (`strict`, pydantic plugin), wired into
   pre-commit and CI, plus a `py.typed` marker so the package ships its types.
-- GitHub Actions CI (lint/format plus tests on Python 3.10–3.13) and
+- GitHub Actions CI (lint/format plus tests on Python 3.10–3.14) and
   pre-commit hooks.
 - Test suites for the request handler, console formatter, and CLI, plus
   coverage reporting (`pytest-cov`, `fail_under = 85`).
@@ -42,8 +42,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pinned GitHub Actions in CI to full commit SHAs (with version comments)
   instead of mutable tags, to harden the workflow against tag-movement
   supply-chain attacks. Dependabot keeps the SHAs and comments updated.
-- Pinned the Docker base image (`python:3.12-slim`) by digest for
+- Pinned the Docker base image (`python:3.14-slim`) by digest for
   reproducible, tamper-evident builds.
+- Upgraded the Docker base image to Python 3.14 and added 3.14 to the CI test
+  matrix, so the shipped runtime stays within the tested range (3.10–3.14).
+  Advertised 3.14 support via a trove classifier in `pyproject.toml`.
 
 ### Removed
 - `requirements.txt` and `requirements-dev.txt`, superseded by `pyproject.toml`
