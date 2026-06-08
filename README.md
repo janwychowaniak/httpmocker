@@ -26,6 +26,10 @@ pip install .
 This installs the `httpmocker` command along with its dependencies. After
 installation you can invoke it as `httpmocker` (or `python -m httpmocker`).
 
+> **Using [uv](https://docs.astral.sh/uv/)?** Run `uv tool install .` from the
+> cloned directory to install the `httpmocker` CLI into an isolated environment
+> (like `pipx`). For a locked development setup, see [Development](#development).
+
 ## Quick Start
 
 ```bash
@@ -357,12 +361,17 @@ Top-level JSON arrays must be served from a `payload_file` — `payload_inline` 
 
 ### Multiple Environment Configs
 
-Create different configuration files for various testing scenarios:
+Keep one config per scenario in the `configs/` directory and pick one at run
+time with `-c`:
 
-- `config.dev.json` - Development API responses
-- `config.staging.json` - Staging environment simulation
-- `config.error.json` - Error scenario testing
-- `config.performance.json` - High-latency simulation
+- `configs/dev.json` - Development API responses
+- `configs/staging.json` - Staging environment simulation
+- `configs/error.json` - Error scenario testing
+- `configs/performance.json` - High-latency simulation
+
+```bash
+python -m httpmocker -p 8080 -c configs/staging.json
+```
 
 ## Docker Usage
 
@@ -449,12 +458,23 @@ docker run --network myapp-test \
 - Runtime dependencies (bottle, pydantic, rich) are declared in `pyproject.toml`
   and installed automatically by `pip install .`
 
+### Development Environment
+
+Plain `pip` works everywhere and is what CI uses; [uv](https://docs.astral.sh/uv/)
+is supported on top for a reproducible, fully-pinned environment from `uv.lock`:
+
+```bash
+# pip: resolve dev dependencies fresh from pyproject.toml's ranges
+pip install -e ".[dev]"
+
+# uv: install the exact versions pinned in uv.lock (prefix commands with `uv run`)
+uv sync --extra dev
+uv lock              # regenerate the lockfile after changing dependencies
+```
+
 ### Running Tests
 
 ```bash
-# Install development dependencies
-pip install -e ".[dev]"
-
 # Run unit tests
 python -m pytest tests/ -v
 

@@ -38,6 +38,29 @@ Coverage is configured in `pyproject.toml` (`--cov=httpmocker`, term-missing
 report, `fail_under = 85`). The suite is dependency-free: the WSGI app is driven
 directly via a small in-test client, so no extra web-test framework is needed.
 
+### Dependency Management
+
+The project is a standard PEP 621 / hatchling package, so plain `pip` works
+everywhere and is what CI uses. `uv` is layered on top for a reproducible,
+fully-pinned developer environment driven by `uv.lock`.
+
+```bash
+# Create/refresh a locked dev environment (.venv) from uv.lock
+uv sync --extra dev
+
+# Run commands inside that environment
+uv run pytest -v
+uv run httpmocker -p 8080 -c configs/example.json
+
+# Regenerate the lockfile after editing dependencies in pyproject.toml
+uv lock
+```
+
+`uv sync` installs the exact versions pinned in `uv.lock`, whereas
+`pip install -e ".[dev]"` resolves fresh from the ranges in `pyproject.toml`.
+Both work: CI and the published install use pip, while `uv` provides local
+reproducibility and is how Dependabot keeps `pyproject.toml` and `uv.lock` in sync.
+
 ### Docker
 
 ```bash
