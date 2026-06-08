@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Raised the minimum supported Python version to 3.10.
 - Consolidated dependencies into `pyproject.toml` as the single source of
   truth; the Docker image now installs the package directly with `pip install .`.
+  The image build and runtime were verified end-to-end against a live registry
+  (`docker build`, container reaching `healthy` via the `HEALTHCHECK`, and the
+  example endpoints served correctly).
 - Pinned GitHub Actions in CI to full commit SHAs (with version comments)
   instead of mutable tags, to harden the workflow against tag-movement
   supply-chain attacks. Dependabot keeps the SHAs and comments updated.
