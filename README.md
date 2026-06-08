@@ -76,19 +76,18 @@ Example output:
       "method": "GET",
       "path": "/api/users",
       "status": 200,
-      "payload_inline": {
-        "users": [
-          {"id": 1, "name": "John Doe"},
-          {"id": 2, "name": "Jane Smith"}
-        ]
-      },
+      "payload_file": "payloads/example.json",
       "delay_ms": 100
     },
     {
       "method": "POST",
       "path": "/api/login",
       "status": 401,
-      "payload_file": "payloads/login_error.json",
+      "payload_inline": {
+        "error": "invalid_credentials",
+        "message": "Username or password is incorrect",
+        "code": 401
+      },
       "delay_ms": 50
     },
     {
@@ -117,19 +116,44 @@ Use _either_ `payload_inline` for simple JSON objects _or_ `payload_file` for co
 
 ## Example Payloads
 
-Create payload files in the `payloads/` directory. httpmocker supports both JSON objects and JSON arrays as top-level responses:
+Create payload files in the `payloads/` directory. A payload file can hold a
+top-level JSON **object** `{}` or a top-level JSON **array** `[]` — note that
+`payload_inline` accepts objects only, so arrays must use `payload_file`. The
+repo ships one example of each:
 
-**JSON Object Response (payloads/login_error.json):**
+**JSON object file — `payloads/example.json`** (excerpt; the full file lists three users):
 
 ```json
 {
-  "error": "invalid_credentials",
-  "message": "Username or password is incorrect",
-  "code": 401
+  "users": [
+    {
+      "id": 1,
+      "username": "alice_admin",
+      "email": "alice@example.com",
+      "role": "administrator",
+      "status": "active",
+      "created_at": "2024-01-01T12:00:00Z",
+      "profile": {
+        "first_name": "Alice",
+        "last_name": "Johnson",
+        "department": "Engineering"
+      }
+    }
+  ],
+  "pagination": {
+    "total": 3,
+    "page": 1,
+    "per_page": 10,
+    "total_pages": 1
+  },
+  "meta": {
+    "retrieved_at": "2024-01-15T10:30:00Z",
+    "api_version": "v1"
+  }
 }
 ```
 
-**JSON Array Response (payloads/urls_list.json):**
+**JSON array file — `payloads/urls_list.json`:**
 
 ```json
 [
@@ -139,29 +163,6 @@ Create payload files in the `payloads/` directory. httpmocker supports both JSON
   {"url": "https://sample.localhost:3000/health"},
   {"url": "https://placeholder.dev/api/status"}
 ]
-```
-
-**Complex JSON Object (payloads/user_list.json):**
-
-```json
-{
-  "users": [
-    {
-      "id": 1,
-      "username": "admin",
-      "email": "admin@example.com",
-      "role": "administrator"
-    },
-    {
-      "id": 2,
-      "username": "user1",
-      "email": "user1@example.com",
-      "role": "user"
-    }
-  ],
-  "total": 2,
-  "page": 1
-}
 ```
 
 ## Console Output
@@ -302,7 +303,7 @@ httpmocker/
       "method": "GET",
       "path": "/api/suspicious-urls",
       "status": 200,
-      "payload_file": "payloads/suspicious_urls.json",
+      "payload_file": "payloads/urls_list.json",
       "delay_ms": 100
     }
   ]
@@ -343,7 +344,10 @@ Top-level JSON arrays must be served from a `payload_file` — `payload_inline` 
       "method": "GET",
       "path": "/api/reports/heavy",
       "status": 200,
-      "payload_file": "payloads/large_report.json",
+      "payload_inline": {
+        "report": "generated",
+        "rows": 100000
+      },
       "delay_ms": 3000
     }
   ]
