@@ -213,6 +213,10 @@ __marimo__/
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+# httpmocker - user-managed configs live in configs/; keep only the shipped example
+configs/*.json
+!configs/example.json
+
 
 # --------------- Environments ---------------
 

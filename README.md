@@ -29,10 +29,10 @@ installation you can invoke it as `httpmocker` (or `python -m httpmocker`).
 ## Quick Start
 
 ```bash
-cp config_example.json config.json           # 1. Copy the example configuration
-python -m httpmocker -p 8080 -c config.json  # 2. Run the mock server
+cp configs/example.json configs/config.json          # 1. Copy the example configuration
+python -m httpmocker -p 8080 -c configs/config.json  # 2. Run the mock server
 
-curl http://localhost:8080/api/users         # 3. Test with curl
+curl http://localhost:8080/api/users                 # 3. Test with curl
 ```
 
 ## Usage
@@ -51,7 +51,7 @@ python -m httpmocker -p <port> -c <config_file>
 You can validate your configuration file without starting the server:
 
 ```bash
-python -m httpmocker -p 8080 -c config.json --validate-config
+python -m httpmocker -p 8080 -c configs/config.json --validate-config
 ```
 
 This will:
@@ -62,7 +62,7 @@ This will:
 
 Example output:
 ```
-✓ Configuration file 'config.json' is valid
+✓ Configuration file 'configs/config.json' is valid
 ✓ Found 8 endpoint(s)
 ✓ All payload files exist
 ```
@@ -241,25 +241,26 @@ Bottle automatically decodes URL-encoded paths, so configure paths in decoded fo
 ```
 httpmocker/
 ├── httpmocker/                  # Main package
-│   ├── __init__.py             # Package metadata & version
-│   ├── __main__.py             # CLI entry point
-│   ├── config_loader.py        # Configuration parsing & validation
-│   ├── request_handler.py      # HTTP request processing & routing
-│   ├── console_formatter.py    # Console logging & output
-│   └── py.typed                # PEP 561 typing marker
+│   ├── __init__.py             # Package metadata & version
+│   ├── __main__.py             # CLI entry point
+│   ├── config_loader.py        # Configuration parsing & validation
+│   ├── request_handler.py      # HTTP request processing & routing
+│   ├── console_formatter.py    # Console logging & output
+│   └── py.typed                # PEP 561 typing marker
 ├── tests/                      # Unit tests
-│   ├── test_config_loader.py
-│   ├── test_request_handler.py
-│   ├── test_console_formatter.py
-│   └── test_main.py
+│   ├── test_config_loader.py
+│   ├── test_request_handler.py
+│   ├── test_console_formatter.py
+│   └── test_main.py
+├── configs/                    # API configuration files
+│   └── example.json            # Example config (copy to your own)
 ├── payloads/                   # External payload files
-│   ├── example.json
-│   └── urls_list.json
+│   ├── example.json
+│   └── urls_list.json
 ├── .github/                    # CI & automation
-│   ├── workflows/
-│   │   └── ci.yml              # Lint/format/types, audit, Docker scan, tests
-│   └── dependabot.yml          # Grouped dependency updates
-├── config_example.json         # Example configuration
+│   ├── workflows/
+│   │   └── ci.yml              # Lint/format/types, audit, Docker scan, tests
+│   └── dependabot.yml          # Grouped dependency updates
 ├── docker-compose.example.yml  # Example Docker Compose setup
 ├── Dockerfile                  # Container image
 ├── .dockerignore               # Docker build-context exclusions
@@ -376,7 +377,7 @@ docker build -t httpmocker:latest .
 **Basic usage:**
 ```bash
 docker run --name httpmocker-instance -p 8080:8080 \
-  -v $(pwd)/config.json:/app/config.json:ro \
+  -v $(pwd)/configs/config.json:/app/config.json:ro \
   -v $(pwd)/payloads:/app/payloads:ro \
   httpmocker:latest
 ```
@@ -388,7 +389,7 @@ docker network create testing
 
 # Run httpmocker on the network
 docker run --name httpmocker --network testing \
-  -v $(pwd)/config.json:/app/config.json:ro \
+  -v $(pwd)/configs/config.json:/app/config.json:ro \
   -v $(pwd)/payloads:/app/payloads:ro \
   httpmocker:latest
 
@@ -415,7 +416,7 @@ docker-compose up
 # Start httpmocker
 docker run -d --name api-mock \
   -p 8080:8080 \
-  -v $(pwd)/config.json:/app/config.json:ro \
+  -v $(pwd)/configs/config.json:/app/config.json:ro \
   -v $(pwd)/payloads:/app/payloads:ro \
   httpmocker:latest
 
@@ -430,7 +431,7 @@ docker network create myapp-test
 
 # Start mock service
 docker run -d --name mock-api --network myapp-test \
-  -v $(pwd)/test-config.json:/app/config.json:ro \
+  -v $(pwd)/configs/test-config.json:/app/config.json:ro \
   -v $(pwd)/test-payloads:/app/payloads:ro \
   httpmocker:latest
 
@@ -458,7 +459,7 @@ pip install -e ".[dev]"
 python -m pytest tests/ -v
 
 # Validate configuration
-python -m httpmocker -p 8080 -c config_example.json --validate-config
+python -m httpmocker -p 8080 -c configs/example.json --validate-config
 ```
 
 ### Linting & Formatting
@@ -492,7 +493,7 @@ pre-commit run --all-files
 **Local development:**
 ```bash
 # Start the mock server
-python -m httpmocker -p 8080 -c config_example.json
+python -m httpmocker -p 8080 -c configs/example.json
 
 # In another terminal, test with curl
 curl -X GET http://localhost:8080/api/users
@@ -503,12 +504,12 @@ curl -X GET http://localhost:8080/health
 **Docker development:**
 ```bash
 # Validate locally before containerizing
-python -m httpmocker -p 8080 -c config.json --validate-config
+python -m httpmocker -p 8080 -c configs/config.json --validate-config
 
 # Build and test the Docker image
 docker build -t httpmocker:latest .
 docker run --name httpmocker-dev -p 8080:8080 \
-  -v $(pwd)/config_example.json:/app/config.json:ro \
+  -v $(pwd)/configs/example.json:/app/config.json:ro \
   -v $(pwd)/payloads:/app/payloads:ro \
   httpmocker:latest
 ```

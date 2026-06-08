@@ -12,13 +12,13 @@ httpmocker is a standalone HTTP REST API mocker for integration and end-to-end t
 
 ```bash
 # Basic usage
-python -m httpmocker -p 8080 -c config.json
+python -m httpmocker -p 8080 -c configs/config.json
 
 # Using the example configuration
-python -m httpmocker -p 8080 -c config_example.json
+python -m httpmocker -p 8080 -c configs/example.json
 
 # Validate configuration without starting server
-python -m httpmocker -p 8080 -c config.json --validate-config
+python -m httpmocker -p 8080 -c configs/config.json --validate-config
 ```
 
 ### Testing
@@ -46,7 +46,7 @@ docker build -t httpmocker:latest .
 
 # Run with mounted config
 docker run --name httpmocker-instance -p 8080:8080 \
-  -v $(pwd)/config.json:/app/config.json:ro \
+  -v $(pwd)/configs/config.json:/app/config.json:ro \
   -v $(pwd)/payloads:/app/payloads:ro \
   httpmocker:latest
 ```
@@ -152,7 +152,7 @@ The application follows a clean separation of concerns with four main modules:
 
 ### Configuration Structure
 
-Each endpoint in `config.json` requires:
+Each endpoint in the config file requires:
 - `method` (string): Uppercase HTTP method (GET, POST, PUT, DELETE, etc.)
 - `path` (string): Exact path including leading slash
 - `status` (integer): HTTP status code (100-599)
@@ -226,6 +226,8 @@ httpmocker/
 │   ├── test_request_handler.py
 │   ├── test_console_formatter.py
 │   └── test_main.py
+├── configs/                    # API configuration files
+│   └── example.json            # Example config (copy to your own)
 ├── payloads/                   # External payload files
 │   ├── example.json
 │   └── urls_list.json
@@ -233,7 +235,6 @@ httpmocker/
 │   ├── workflows/
 │   │   └── ci.yml              # Lint/format/types, audit, Docker scan, tests
 │   └── dependabot.yml          # Grouped dependency updates
-├── config_example.json         # Example configuration
 ├── docker-compose.example.yml  # Example Docker Compose setup
 ├── Dockerfile                  # Container image
 ├── .dockerignore               # Docker build-context exclusions

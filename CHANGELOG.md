@@ -32,6 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - This changelog.
 
 ### Changed
+- Moved the example configuration into a dedicated `configs/` directory
+  (`config_example.json` → `configs/example.json`), mirroring the `payloads/`
+  layout, so user-managed configurations have a home separate from project code.
+  `.gitignore` keeps the shipped `configs/example.json` tracked while ignoring
+  other `configs/*.json`. Note: `payload_file` paths stay relative to the working
+  directory (run from the project root), not to the config file's location.
 - Modernized type hints to PEP 585/604 syntax.
 - Raised the minimum supported Python version to 3.10.
 - Consolidated dependencies into `pyproject.toml` as the single source of

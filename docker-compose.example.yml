@@ -6,7 +6,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./config.json:/app/config.json:ro
+      - ./configs/config.json:/app/config.json:ro
       - ./payloads:/app/payloads:ro
     networks:
       - testing
