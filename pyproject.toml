@@ -39,7 +39,7 @@ dev = [
     "pytest-cov>=5",
     # Pinned exactly: `ruff format` output is version-sensitive, so local, CI,
     # and the pre-commit hook must all use the same version.
-    "ruff==0.15.8",
+    "ruff==0.15.14",
     "mypy>=1.18",
     "pip-audit>=2.7",
 ]
