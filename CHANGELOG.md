@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   HIGH/CRITICAL vulnerabilities.
 - `uv.lock` for reproducible, fully-pinned dependency resolution with
   hashes (`pyproject.toml` remains the source of truth for version ranges).
+- Secret scanning with gitleaks: `.gitleaks.toml` (built-in rules plus
+  prefix-anchored OpenRouter and Anthropic key rules), pre-commit hooks that
+  scan staged changes, commit messages and pushed commits, and a CI workflow
+  that scans the full history and all commit messages on every push, pull
+  request and weekly.
 - This changelog.
 
 ### Changed

@@ -261,14 +261,18 @@ httpmocker/
 ├── payloads/                   # External payload files
 │   ├── example.json
 │   └── urls_list.json
+├── scripts/
+│   └── gitleaks/               # Secret-scan hook scripts (wired via pre-commit)
 ├── .github/                    # CI & automation
 │   ├── workflows/
-│   │   └── ci.yml              # Lint/format/types, audit, Docker scan, tests
+│   │   ├── ci.yml              # Lint/format/types, audit, Docker scan, tests
+│   │   └── gitleaks.yml        # Secret scan of history and commit messages
 │   └── dependabot.yml          # Grouped dependency updates
 ├── docker-compose.example.yml  # Example Docker Compose setup
 ├── Dockerfile                  # Container image
 ├── .dockerignore               # Docker build-context exclusions
-├── .pre-commit-config.yaml     # Pre-commit hooks (ruff lint+format, mypy, hygiene)
+├── .pre-commit-config.yaml     # Pre-commit hooks (ruff, mypy, hygiene, gitleaks)
+├── .gitleaks.toml              # gitleaks rules (defaults + add-on provider rules)
 ├── pyproject.toml              # Packaging, dependencies & tooling config
 ├── uv.lock                     # Fully-pinned dependency lockfile
 ├── .gitignore
@@ -507,6 +511,12 @@ pre-commit install
 # Optional: run all hooks against the whole tree
 pre-commit run --all-files
 ```
+
+The same install also enables secret scanning with [gitleaks](https://github.com/gitleaks/gitleaks)
+on staged changes, commit messages, and pushes. It needs the `gitleaks` binary on
+your `PATH` (e.g. `apt install gitleaks` or `brew install gitleaks`); without it,
+those hooks print a warning and skip. CI runs the same scan on every push and pull
+request.
 
 ### Manual Testing
 

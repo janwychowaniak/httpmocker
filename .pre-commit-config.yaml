@@ -1,5 +1,14 @@
 # See https://pre-commit.com for usage:
 #   pip install pre-commit && pre-commit install
+# The gitleaks hooks below also need the gitleaks binary on PATH.
+
+# `unsupported_script` (the local gitleaks hooks) needs pre-commit 4.4+.
+minimum_pre_commit_version: "4.4.0"
+# A plain `pre-commit install` sets up every git hook type used below.
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
+# Hooks run at commit time unless they set their own stages (as gitleaks does).
+default_stages: [pre-commit]
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
@@ -32,3 +41,29 @@ repos:
         additional_dependencies:
           - pydantic>=2.11
           - rich>=14.0
+
+  # Secret scanning with gitleaks (config: .gitleaks.toml) on every channel a
+  # secret can enter through: staged content, the commit message, and the
+  # pushed commits. Local hooks are advisory (--no-verify skips them); the CI
+  # workflow .github/workflows/gitleaks.yml is the non-bypassable layer.
+  - repo: local
+    hooks:
+      - id: gitleaks-staged
+        name: gitleaks (staged changes)
+        entry: scripts/gitleaks/staged.sh
+        language: unsupported_script
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: gitleaks-commit-msg
+        name: gitleaks (commit message)
+        entry: scripts/gitleaks/commit-msg.sh
+        language: unsupported_script
+        stages: [commit-msg]
+      - id: gitleaks-pre-push
+        name: gitleaks (pushed commits)
+        entry: scripts/gitleaks/pre-push.sh
+        language: unsupported_script
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

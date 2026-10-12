@@ -1,0 +1,32 @@
+name: gitleaks
+
+# Server-side secret scan: the non-bypassable layer behind the local pre-commit
+# hooks (which --no-verify skips). Scans file content and commit messages.
+on:
+  push:
+  pull_request:
+  schedule: [{ cron: "17 4 * * 1" }] # weekly re-audit of full history
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10 # fail fast if an apt mirror hangs (default is 6 h)
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0 # full history for the content scan and git log --all
+      - name: Install gitleaks
+        run: sudo apt-get update && sudo apt-get install -y gitleaks
+      - name: Scan content
+        run: gitleaks detect --source . --config .gitleaks.toml --redact -v
+      # Message-as-text scan: content scans never see commit messages. --config
+      # is required because autodetection follows --source, not the cwd.
+      - name: Scan commit messages
+        run: |
+          git log --all --format=%B > "$RUNNER_TEMP/m.txt"
+          gitleaks detect --no-git --source "$RUNNER_TEMP/m.txt" --config .gitleaks.toml --redact -v

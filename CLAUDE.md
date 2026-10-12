@@ -101,7 +101,8 @@ import is exempted via a per-module override in `pyproject.toml`.
 ### Pre-commit Hooks
 
 ```bash
-# Install hooks once (runs ruff lint+format and basic hygiene on each commit)
+# Install hooks once: ruff lint+format, mypy and basic hygiene on each commit,
+# plus gitleaks secret scanning on commit, commit message and push
 pip install pre-commit
 pre-commit install
 
@@ -109,12 +110,25 @@ pre-commit install
 pre-commit run --all-files
 ```
 
+A plain `pre-commit install` sets up the `pre-commit`, `commit-msg` and `pre-push`
+git hooks (`default_install_hook_types`). The gitleaks hooks are local scripts in
+`scripts/gitleaks/` that call the system `gitleaks` binary (`apt install gitleaks`)
+with the rules in `.gitleaks.toml`; without the binary they warn and skip. They
+scan staged content, the commit message (a channel content scans never see), and
+every local commit not yet on a remote. Local hooks are advisory: `--no-verify`
+skips them, so the CI workflow is the enforcing layer. Validate any
+`.gitleaks.toml` change against a corpus of fake keys before committing it, since
+a new rule's `keywords` can suppress built-in detections.
+
 ### Continuous Integration
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and on
 pull requests: a lint/format/types job (`ruff check` + `ruff format --check` +
 `mypy`), a dependency-audit job (`pip-audit`), a Docker image scan (Trivy), and a
 test job across Python 3.10–3.14.
+
+A separate workflow (`.github/workflows/gitleaks.yml`) scans the full history and
+all commit messages for secrets on every push, pull request and weekly.
 
 ## Architecture
 
@@ -254,14 +268,18 @@ httpmocker/
 ├── payloads/                   # External payload files
 │   ├── example.json
 │   └── urls_list.json
+├── scripts/
+│   └── gitleaks/               # Secret-scan hook scripts (wired via pre-commit)
 ├── .github/                    # CI & automation
 │   ├── workflows/
-│   │   └── ci.yml              # Lint/format/types, audit, Docker scan, tests
+│   │   ├── ci.yml              # Lint/format/types, audit, Docker scan, tests
+│   │   └── gitleaks.yml        # Secret scan of history and commit messages
 │   └── dependabot.yml          # Grouped dependency updates
 ├── docker-compose.example.yml  # Example Docker Compose setup
 ├── Dockerfile                  # Container image
 ├── .dockerignore               # Docker build-context exclusions
-├── .pre-commit-config.yaml     # Pre-commit hooks (ruff lint+format, mypy, hygiene)
+├── .pre-commit-config.yaml     # Pre-commit hooks (ruff, mypy, hygiene, gitleaks)
+├── .gitleaks.toml              # gitleaks rules (defaults + add-on provider rules)
 ├── pyproject.toml              # Packaging, dependencies & tooling config
 ├── uv.lock                     # Fully-pinned dependency lockfile
 ├── .gitignore
