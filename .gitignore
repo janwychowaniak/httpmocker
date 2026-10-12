@@ -223,32 +223,22 @@ configs/*.json
 .env
 .envrc
 .env.local
+.venv/
+venv/
 env/
 ENV/
 env.bak/
 
 # --------------- AI -------------------------
 
-# Aider
-.aider.conf.yml
+# Aider (the same pattern aider adds itself; also catches .aiderignore)
 .aider*
 
-# Claude Code - personal/session files only
+# Claude Code - personal files only; logs and sessions live in ~/.claude/
 .claude/settings.local.json
-.claude/*.log
-.claude/logs/
-.claude/cache/
+.claude/worktrees/
+CLAUDE.local.md
 
-# OpenCode - session data and local files
-.opencode/
-
-# Gemini CLI - project-level config dir (session data in ~/.gemini/)
-# NOTE: commit .gemini/settings.json explicitly if sharing with team
-.gemini/
-
-# Codex CLI - project-level config (session data, history, logs in ~/.codex/)
-# NOTE: commit .codex/config.toml explicitly if sharing with team
-.codex/
-
-# Cursor - nothing needed (all data in ~/.config/Cursor/ or ~/.cursor/)
-# Optional: .cursorignore if you want to control AI context (safe to commit)
+# OpenCode - sessions live in ~/.local/share/opencode/; .opencode/ is shareable config
+# Codex CLI - sessions live in ~/.codex/; .codex/ is shareable config (config.toml, skills/)
+# Cursor - nothing needed; .cursorignore and .cursor/rules/ are safe to commit
