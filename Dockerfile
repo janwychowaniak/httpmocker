@@ -1,6 +1,6 @@
 # Pinned by digest for reproducible, tamper-evident builds. The tag is kept
 # in the comment for readability; Dependabot's docker ecosystem updates both.
-FROM python:3.14.5-slim@sha256:c845af9399020c7e562969a13689e929074a10fd057acd1b1fad06a2fb068e97
+FROM python:3.14.8-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170
 
 # Set working directory
 WORKDIR /app
@@ -11,9 +11,13 @@ RUN groupadd -r httpmocker && useradd -r -g httpmocker httpmocker
 # Install the application and its runtime dependencies from pyproject.toml
 # (the single source of truth). The source is copied first because the version
 # is read dynamically from httpmocker/__init__.py at build time.
+# pip is removed afterwards: the runtime never needs it, and its vendored
+# libraries (urllib3, msgpack, setuptools) regularly carry CVEs that would
+# otherwise fail the image scan.
 COPY pyproject.toml README.md ./
 COPY httpmocker/ ./httpmocker/
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir . && \
+    pip uninstall -y pip
 
 # Create directory for mounted payload volumes
 RUN mkdir -p /app/payloads && \

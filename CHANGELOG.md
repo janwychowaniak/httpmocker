@@ -63,3 +63,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Request logs now show the client's source port instead of `host:unknown`.
   The default `wsgiref` server does not populate `REMOTE_PORT`, so a custom
   WSGI request handler now exposes the client port to the application.
+
+### Security
+- Refreshed the Docker base image to `python:3.14.8-slim` (pinned by digest),
+  picking up Debian fixes for HIGH vulnerabilities in util-linux and OpenSSL.
+- Removed pip from the runtime Docker image after installing the package. The
+  server never needs it, and the libraries pip vendors (urllib3, msgpack,
+  setuptools) carried HIGH vulnerabilities that failed the Trivy image scan.
