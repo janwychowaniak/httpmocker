@@ -31,7 +31,9 @@ repos:
       - id: ruff-format
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.19.1
+    # Keep in sync with the mypy version locked in uv.lock (pyproject.toml only
+    # sets a floor, so CI also resolves the latest release).
+    rev: v2.4.0
     hooks:
       - id: mypy
         # Type-check only the package; tests are not under strict typing.
