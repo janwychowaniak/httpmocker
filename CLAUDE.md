@@ -130,6 +130,37 @@ test job across Python 3.10–3.14.
 A separate workflow (`.github/workflows/gitleaks.yml`) scans the full history and
 all commit messages for secrets on every push, pull request and weekly.
 
+### Releasing
+
+`.github/workflows/release.yml` runs on an **annotated** `v*` tag. Before anything is
+published, the `publish` job checks that the tag is annotated and equals
+`v` + `httpmocker.__version__`, runs the suite, builds the wheel and sdist (installing
+the wheel into a clean venv), builds the image, scans it with Trivy (the CI gate) and
+smoke-tests it against `configs/example.json`. It then pushes
+`ghcr.io/janwychowaniak/httpmocker:<version>` and `latest` (amd64; `latest` is not a
+contract). The `release` job pulls that image by digest, saves it as
+`httpmocker-<version>-image-amd64.tar.gz`, proves the archive loads back as the same image
+Id (`scripts/release/archive-image.sh`), and attaches it with the wheel, the sdist and
+`SHA256SUMS` to the GitHub release, whose notes must equal the tag message. It is the only
+job with `contents: write` and runs after the push: **if it fails, re-run that job alone**,
+since re-running the whole workflow builds and pushes again.
+
+Every release, in this order:
+1. Set `__version__` in `httpmocker/__init__.py`, move `[Unreleased]` in `CHANGELOG.md` to
+   `[X.Y.Z] - YYYY-MM-DD`, and update the version in the README's release examples.
+2. Push, and wait for CI to be green on that commit.
+3. Tag it with the notes as its message and push the tag:
+   `git tag -a vX.Y.Z -F notes.txt && git push origin vX.Y.Z`. Git's default clean-up
+   strips every line that starts with `#`, so the notes carry no Markdown headings.
+4. After the workflow, record the image digest and Id from its summary in
+   `CHANGELOG.md` in a follow-up commit.
+
+A tag is never pushed again, not even to fix its message: that could publish the same
+version under another digest. A wrong line is corrected in `CHANGELOG.md` instead.
+Steps that run only on a tag are exercised by no CI run beforehand, so a change to the
+release workflow is checked locally as far as it goes, then by reading its log at the
+next release.
+
 ## Architecture
 
 ### Core Components
@@ -269,11 +300,14 @@ httpmocker/
 │   ├── example.json
 │   └── urls_list.json
 ├── scripts/
-│   └── gitleaks/               # Secret-scan hook scripts (wired via pre-commit)
+│   ├── gitleaks/               # Secret-scan hook scripts (wired via pre-commit)
+│   └── release/
+│       └── archive-image.sh    # Save the published image and prove it loads back
 ├── .github/                    # CI & automation
 │   ├── workflows/
 │   │   ├── ci.yml              # Lint/format/types, audit, Docker scan, tests
-│   │   └── gitleaks.yml        # Secret scan of history and commit messages
+│   │   ├── gitleaks.yml        # Secret scan of history and commit messages
+│   │   └── release.yml         # On a v* tag: GHCR image + GitHub release files
 │   └── dependabot.yml          # Grouped dependency updates
 ├── docker-compose.example.yml  # Example Docker Compose setup
 ├── Dockerfile                  # Container image

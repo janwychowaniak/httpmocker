@@ -34,6 +34,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scan staged changes, commit messages and pushed commits, and a CI workflow
   that scans the full history and all commit messages on every push, pull
   request and weekly.
+- Release workflow: on an annotated `vX.Y.Z` tag it checks the tag against
+  the package version, runs the suite, builds and smoke-tests the wheel and
+  the image, scans the image with Trivy, and publishes it to GHCR
+  (`ghcr.io/janwychowaniak/httpmocker`, version and `latest`, amd64). The
+  GitHub release gets the image as a `docker save` archive (verified to load
+  back as the same image), the wheel, the sdist and `SHA256SUMS`, with the tag
+  message as its notes.
 - This changelog.
 
 ### Changed

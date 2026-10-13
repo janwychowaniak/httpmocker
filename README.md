@@ -17,6 +17,20 @@ A standalone server that serves predefined responses based on request method and
 
 ## Installation
 
+### From a release
+
+Each [GitHub release](https://github.com/janwychowaniak/httpmocker/releases) attaches the
+wheel, the sdist and the Docker image archive, with their `SHA256SUMS`. Install the CLI
+straight from the release wheel:
+
+```bash
+pip install https://github.com/janwychowaniak/httpmocker/releases/download/v0.1.0/httpmocker-0.1.0-py3-none-any.whl
+```
+
+The Docker image is also published to GHCR; see [Docker Usage](#docker-usage).
+
+### From source
+
 ```bash
 git clone https://github.com/janwychowaniak/httpmocker.git
 cd httpmocker
@@ -262,11 +276,14 @@ httpmocker/
 │   ├── example.json
 │   └── urls_list.json
 ├── scripts/
-│   └── gitleaks/               # Secret-scan hook scripts (wired via pre-commit)
+│   ├── gitleaks/               # Secret-scan hook scripts (wired via pre-commit)
+│   └── release/
+│       └── archive-image.sh    # Save the published image and prove it loads back
 ├── .github/                    # CI & automation
 │   ├── workflows/
 │   │   ├── ci.yml              # Lint/format/types, audit, Docker scan, tests
-│   │   └── gitleaks.yml        # Secret scan of history and commit messages
+│   │   ├── gitleaks.yml        # Secret scan of history and commit messages
+│   │   └── release.yml         # On a v* tag: GHCR image + GitHub release files
 │   └── dependabot.yml          # Grouped dependency updates
 ├── docker-compose.example.yml  # Example Docker Compose setup
 ├── Dockerfile                  # Container image
@@ -379,11 +396,31 @@ python -m httpmocker -p 8080 -c configs/staging.json
 
 ## Docker Usage
 
-### Building the Image
+### Getting the Image
+
+Pull the published image from GHCR (tagged with each release version, plus `latest`):
+
+```bash
+docker pull ghcr.io/janwychowaniak/httpmocker:0.1.0
+```
+
+On a host that cannot reach the registry, download `httpmocker-<version>-image-amd64.tar.gz`
+and `SHA256SUMS` from the [release page](https://github.com/janwychowaniak/httpmocker/releases),
+then verify and load the archive:
+
+```bash
+sha256sum -c SHA256SUMS --ignore-missing
+docker load --input httpmocker-0.1.0-image-amd64.tar.gz
+```
+
+Or build it yourself:
 
 ```bash
 docker build -t httpmocker:latest .
 ```
+
+The examples below use the locally built `httpmocker:latest`; substitute
+`ghcr.io/janwychowaniak/httpmocker:<version>` to run the published image.
 
 ### Running with Docker
 

@@ -1,0 +1,202 @@
+name: release
+
+# Publishes a release on an annotated version tag (vX.Y.Z):
+# - the Docker image to GHCR, under the version and `latest`;
+# - on the GitHub release page: the image as a `docker save` archive (for hosts
+#   that cannot reach the registry), the wheel and sdist, and SHA256SUMS.
+# The release notes are the tag message.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  publish:
+    name: Verify and publish the image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+      image-id: ${{ steps.push.outputs.image-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      # Checked before anything is published. The checkout stores the tagged commit
+      # under the tag's name as a lightweight tag, so the tag is fetched as it was
+      # pushed: only an annotated tag carries the message that becomes the notes.
+      - name: The tag is annotated and matches httpmocker.__version__
+        run: |
+          git fetch --no-tags --depth=1 --force origin \
+            "+refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          if [ "$(git cat-file -t "refs/tags/$GITHUB_REF_NAME")" != tag ]; then
+            echo "::error::$GITHUB_REF_NAME is not an annotated tag, so it carries no release notes"
+            exit 1
+          fi
+          VERSION="$(python -c 'import httpmocker; print(httpmocker.__version__)')"
+          if [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match httpmocker.__version__ $VERSION"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Install the package with dev dependencies
+        run: pip install -e ".[dev]"
+      - name: The suite passes on the tagged commit
+        run: python -m pytest -q
+
+      - name: Build the wheel and sdist
+        run: |
+          pip install build
+          python -m build
+      - name: The wheel installs and runs on its own
+        run: |
+          python -m venv "$RUNNER_TEMP/wheel"
+          "$RUNNER_TEMP/wheel/bin/pip" install "dist/httpmocker-$VERSION-py3-none-any.whl"
+          "$RUNNER_TEMP/wheel/bin/httpmocker" -p 8080 -c configs/example.json --validate-config
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+      - name: Build the image
+        run: |
+          docker build \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.version=$VERSION" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --label "org.opencontainers.image.title=httpmocker" \
+            --label "org.opencontainers.image.description=Standalone HTTP REST API mocker for integration and end-to-end testing" \
+            --label "org.opencontainers.image.licenses=MIT" \
+            -t "$IMAGE:$VERSION" -t "$IMAGE:latest" .
+
+      # Same gate as CI, on the exact image about to be pushed.
+      - name: The image has no fixable HIGH/CRITICAL vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}:${{ env.VERSION }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - name: The image serves the example config before it is pushed
+        run: |
+          trap 'docker logs smoke; docker rm -f smoke > /dev/null' EXIT
+          docker run -d --name smoke -p 127.0.0.1:8080:8080 \
+            -v "$PWD/configs/example.json:/app/config.json:ro" \
+            -v "$PWD/payloads:/app/payloads:ro" \
+            "$IMAGE:$VERSION"
+          for _ in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8080/health > /dev/null && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8080/health
+          curl -fsS http://127.0.0.1:8080/api/some-urls
+          test "$(docker run --rm "$IMAGE:$VERSION" python -c 'import httpmocker; print(httpmocker.__version__)')" = "$VERSION"
+
+      - name: Log in to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Push
+        id: push
+        run: |
+          docker push "$IMAGE:$VERSION"
+          docker push "$IMAGE:latest"
+          DIGEST="$(docker image inspect --format '{{index .RepoDigests 0}}' "$IMAGE:$VERSION")"
+          IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$IMAGE:$VERSION")"
+          echo "digest=${DIGEST#*@}" >> "$GITHUB_OUTPUT"
+          echo "image-id=$IMAGE_ID" >> "$GITHUB_OUTPUT"
+          {
+            echo "### $IMAGE:$VERSION"
+            echo "- digest: \`${DIGEST#*@}\`"
+            echo "- image Id: \`$IMAGE_ID\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # The release files. This is the only job that may write to the repository, and
+  # it runs after the push, so a failure here leaves the published image as it is:
+  # "Re-run failed jobs" repeats this job alone, and nothing is built or pushed twice.
+  release:
+    name: Attach the files to the release
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      packages: read
+    env:
+      DIGEST: ${{ needs.publish.outputs.digest }}
+      IMAGE_ID: ${{ needs.publish.outputs.image-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist/
+
+      - name: Log in to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      # Pulled by digest, so the archive holds exactly what was published.
+      - name: Archive the published image and prove it loads back
+        run: |
+          docker pull "$IMAGE@$DIGEST"
+          docker tag "$IMAGE@$DIGEST" "$IMAGE:$VERSION"
+          scripts/release/archive-image.sh "$IMAGE:$VERSION" "$IMAGE_ID" \
+            "dist/httpmocker-$VERSION-image-amd64.tar.gz"
+
+      - name: Checksums
+        working-directory: dist
+        run: |
+          sha256sum -- * > SHA256SUMS
+          sha256sum -c SHA256SUMS
+          { echo '```'; cat SHA256SUMS; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      # gh reads --notes-from-tag from the local tag, so it is fetched as pushed.
+      - name: Fetch the tag as it was pushed
+        run: |
+          git fetch --no-tags --depth=1 --force origin \
+            "+refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+
+      - name: Create the release, or update its files on a re-run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* \
+              --verify-tag --notes-from-tag --title "$GITHUB_REF_NAME"
+          fi
+
+      # Checked on what was published rather than on what was sent. Trailing
+      # newlines are not part of the comparison.
+      - name: The release notes are the tag message
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          TAG_NOTES="$(git tag --list "$GITHUB_REF_NAME" --format='%(contents)')"
+          RELEASE_NOTES="$(gh release view "$GITHUB_REF_NAME" --json body --jq .body)"
+          if [ -z "$TAG_NOTES" ] || [ "$TAG_NOTES" != "$RELEASE_NOTES" ]; then
+            echo "::error::the notes of release $GITHUB_REF_NAME are not its tag message"
+            diff <(printf '%s\n' "$TAG_NOTES") <(printf '%s\n' "$RELEASE_NOTES") | head -20 || true
+            exit 1
+          fi
