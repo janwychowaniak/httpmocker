@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.0] - 2026-10-14
 
+`ghcr.io/janwychowaniak/httpmocker@sha256:d4761f9827cac4c5549d45056833352ebaf58b6ea4e3e47a38fe4b40cc473706`
+
+Image Id `sha256:5927b7d000450d0e541cc8ff272fa6d9ad12d6be065a8caecdf87e40dcfe1e49`, after a
+pull and after `docker load` of the release file alike. Python 3.14.8, on the same base
+image as 0.1.1. The digest was read from the workflow's push and from a pull of the tag; the
+image can be pulled without logging in. On the published image an inline array is served,
+a config with an unsupported method and a path with `?` fails `--validate-config` with exit
+code 1, the container turns `healthy`, and `docker stop` ends the server in about 0.4
+seconds with exit code 0.
+
+The release notes say every problem is reported at once. That holds within each of two
+passes, as the Changed entry below now says: a config with both kinds of errors shows its
+payload file problems only on the run after its fields are fixed.
+
 ### Added
 - `payload_inline` accepts a top-level JSON array as well as an object, as
   `payload_file` already did, so a short list no longer needs a file of its own.
@@ -27,8 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - a payload file that is not valid JSON, not UTF-8 or cannot be read (every request
     to it got a 500); before, only its existence was checked.
 
-  Every problem is reported at once, a file shared by several endpoints only once. A
-  config this rejects had endpoints that could never respond as configured.
+  Problems are reported in two passes, each listing all it finds: the endpoints' fields
+  first, then, once those pass, the payload files (a file shared by several endpoints
+  only once). A config this rejects had endpoints that could never respond as
+  configured.
 - `docker-compose.example.yml` drops the obsolete `version` key, for which
   `docker compose` printed a warning on every run.
 
