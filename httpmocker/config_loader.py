@@ -14,7 +14,9 @@ class Endpoint(BaseModel):
     path: str = Field(..., description="Exact path to match")
     status: int = Field(..., description="HTTP status code to return")
     delay_ms: int = Field(..., description="Response delay in milliseconds")
-    payload_inline: dict[str, Any] | None = Field(None, description="Inline JSON payload")
+    payload_inline: dict[str, Any] | list[Any] | None = Field(
+        None, description="Inline JSON payload (object or array)"
+    )
     payload_file: str | None = Field(None, description="Path to external payload file")
 
     @field_validator("method")

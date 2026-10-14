@@ -39,6 +39,12 @@ class TestFormatPayloadSource:
         )
         assert cf.format_payload_source(endpoint) == 'payload_inline: {"x":1}'
 
+    def test_inline_array(self):
+        endpoint = Endpoint(
+            method="GET", path="/a", status=200, delay_ms=0, payload_inline=[{"x": 1}, 2]
+        )
+        assert cf.format_payload_source(endpoint) == 'payload_inline: [{"x":1},2]'
+
     def test_inline_truncated_to_50_chars(self):
         endpoint = Endpoint(
             method="GET",

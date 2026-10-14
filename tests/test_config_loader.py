@@ -32,6 +32,24 @@ class TestEndpoint:
         assert endpoint.payload_inline == {"message": "test"}
         assert endpoint.payload_file is None
 
+    def test_valid_endpoint_with_inline_array(self):
+        """Test that an inline payload can be a top-level JSON array, as a file can."""
+        endpoint = Endpoint(
+            method="GET",
+            path="/api/users",
+            status=200,
+            delay_ms=0,
+            payload_inline=[{"id": 1}, {"id": 2}],
+        )
+        assert endpoint.payload_inline == [{"id": 1}, {"id": 2}]
+        assert endpoint.payload_file is None
+
+    @pytest.mark.parametrize("payload", ["text", 42, True])
+    def test_inline_payload_must_be_object_or_array(self, payload):
+        """Test that an inline payload other than an object or an array is rejected."""
+        with pytest.raises(ValueError, match="payload_inline"):
+            Endpoint(method="GET", path="/api/test", status=200, delay_ms=0, payload_inline=payload)
+
     def test_valid_endpoint_with_file_payload(self):
         """Test creating valid endpoint with file payload."""
         endpoint = Endpoint(

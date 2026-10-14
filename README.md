@@ -9,7 +9,7 @@ A standalone server that serves predefined responses based on request method and
 
 - **Standalone HTTP server** - runs as CLI application on configurable port
 - **Static configuration** - JSON-based endpoint-to-response mapping
-- **Flexible payloads** - inline JSON objects, or external payload files (JSON objects or arrays)
+- **Flexible payloads** - JSON objects or arrays, inline in the config or from external payload files
 - **Configurable delays** - simulate network latency per endpoint
 - **Detailed logging** - verbose console output showing all requests and responses
 - **Graceful shutdown** - handles Ctrl+C and SIGTERM (`docker stop`) cleanly, interrupting any in-flight response delay
@@ -129,10 +129,10 @@ Each endpoint requires:
 - **path** (string): Exact path to match (case-sensitive, trailing slash matters)
 - **status** (integer): HTTP status code to return, from 100 to 599
 - **delay_ms** (integer): Response delay in milliseconds, 0 or more
-- **payload_inline** (object) OR **payload_file** (string): Response body content
+- **payload_inline** (object or array) OR **payload_file** (string): Response body content
 
 **Note:**
-Use _either_ `payload_inline` for simple JSON objects _or_ `payload_file` for complex responses stored in separate files.
+Use _either_ `payload_inline` for short responses written into the config _or_ `payload_file` for larger ones stored in separate files. Both take a top-level JSON object `{}` or array `[]`.
 
 A config needs at least one endpoint, and each endpoint exactly one of `payload_inline`
 and `payload_file`; otherwise the server refuses to start and says why. Other fields,
@@ -146,9 +146,8 @@ rule; see [How the container sees your files](#how-the-container-sees-your-files
 ## Example Payloads
 
 Create payload files in the `payloads/` directory. A payload file can hold a
-top-level JSON **object** `{}` or a top-level JSON **array** `[]` — note that
-`payload_inline` accepts objects only, so arrays must use `payload_file`. The
-repo ships one example of each:
+top-level JSON **object** `{}` or a top-level JSON **array** `[]`, just like
+`payload_inline`. The repo ships one example of each:
 
 **JSON object file — `payloads/example.json`** (excerpt; the full file lists three users):
 
@@ -252,7 +251,7 @@ Response: 404 (no match for POST /api/nonexistent)
 ### Response Behavior
 
 - **Content-Type**: Automatically set to `application/json` for responses with content
-- **JSON Support**: Both JSON objects `{}` and JSON arrays `[]` are supported as top-level responses
+- **JSON Support**: Both JSON objects `{}` and JSON arrays `[]` are supported as top-level responses, inline or from a file
 - **HTTP Semantics**:
   - `204 No Content` responses omit Content-Type header and have empty body
   - `HEAD` requests return same headers as corresponding GET but with no response body
@@ -364,7 +363,7 @@ httpmocker/
 }
 ```
 
-Top-level JSON arrays must be served from a `payload_file` — `payload_inline` accepts JSON objects only.
+A short array can also go inline, as `"payload_inline": [{"id": 1}, {"id": 2}]`.
 
 ### Testing HEAD Requests
 

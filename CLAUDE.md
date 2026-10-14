@@ -223,7 +223,7 @@ The application follows a clean separation of concerns with four main modules:
 - **URL decoding**: Bottle automatically decodes URL-encoded paths (configure paths in decoded form)
 - **Interruptible delays**: Ctrl+C or SIGTERM during a delay stops the server at once; the
   interrupted connection is closed without a response (chunked sleep implementation)
-- **JSON support**: Top-level JSON arrays `[]` are supported via `payload_file`; `payload_inline` accepts JSON objects `{}` only
+- **JSON support**: `payload_inline` and `payload_file` both take a top-level JSON object `{}` or array `[]`
 
 ### Configuration Structure
 
@@ -232,7 +232,7 @@ Each endpoint in the config file requires:
 - `path` (string): Exact path including leading slash
 - `status` (integer): HTTP status code (100-599)
 - `delay_ms` (integer): Response delay in milliseconds (≥0)
-- `payload_inline` (object) OR `payload_file` (string): Response body
+- `payload_inline` (object or array) OR `payload_file` (string): Response body
 
 ### Testing Philosophy
 

@@ -96,6 +96,24 @@ class TestMatching:
         assert r.content_type == "application/json"
         assert r.json == {"users": [1, 2]}
 
+    @pytest.mark.parametrize("payload", [[{"id": 1}, {"id": 2}], []])
+    def test_get_inline_array(self, payload):
+        app = make_app(
+            [
+                {
+                    "method": "GET",
+                    "path": "/api/users",
+                    "status": 200,
+                    "delay_ms": 0,
+                    "payload_inline": payload,
+                }
+            ]
+        )
+        r = request(app, "GET", "/api/users")
+        assert r.status == 200
+        assert r.content_type == "application/json"
+        assert r.json == payload
+
     def test_unmatched_path_returns_404(self):
         app = make_app(
             [{"method": "GET", "path": "/a", "status": 200, "delay_ms": 0, "payload_inline": {}}]
@@ -214,8 +232,8 @@ class TestHttpSemantics:
         assert r.body == b""
         assert "Content-Type" not in r.headers
 
-    def test_head_empty_body_with_content_length(self):
-        payload = {"a": 1, "b": 2}
+    @pytest.mark.parametrize("payload", [{"a": 1, "b": 2}, [{"a": 1}, {"b": 2}]])
+    def test_head_empty_body_with_content_length(self, payload):
         app = make_app(
             [
                 {

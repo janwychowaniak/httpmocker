@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `payload_inline` accepts a top-level JSON array as well as an object, as
+  `payload_file` already did, so a short list no longer needs a file of its own.
+  Every existing config stays valid; an inline value that is neither an object nor
+  an array is still rejected.
+
 ## [0.1.1] - 2026-10-14
 
 `ghcr.io/janwychowaniak/httpmocker@sha256:e23073c2adf77d3fd84e362af3fad1005fc83fb7c79d713d8e3a8d8e09df42b4`
