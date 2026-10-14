@@ -77,14 +77,14 @@ python -m httpmocker -p 8080 -c configs/config.json --validate-config
 This will:
 - Parse and validate the JSON structure
 - Check all endpoint configurations
-- Verify that all payload files exist
+- Verify that all payload files exist and hold valid JSON
 - Display a summary and exit
 
 Example output:
 ```
 ✓ Configuration file 'configs/config.json' is valid
 ✓ Found 8 endpoint(s)
-✓ All payload files exist
+✓ All payload files exist and hold valid JSON
 ```
 
 ## Configuration Format
@@ -125,8 +125,8 @@ Example output:
 
 Each endpoint requires:
 
-- **method** (string): HTTP method in uppercase (GET, POST, PUT, DELETE, etc.)
-- **path** (string): Exact path to match (case-sensitive, trailing slash matters)
+- **method** (string): HTTP method in uppercase: GET, POST, PUT, DELETE, PATCH, HEAD or OPTIONS
+- **path** (string): Exact path to match, starting with `/` (case-sensitive, trailing slash matters)
 - **status** (integer): HTTP status code to return, from 100 to 599
 - **delay_ms** (integer): Response delay in milliseconds, 0 or more
 - **payload_inline** (object or array) OR **payload_file** (string): Response body content
@@ -135,8 +135,9 @@ Each endpoint requires:
 Use _either_ `payload_inline` for short responses written into the config _or_ `payload_file` for larger ones stored in separate files. Both take a top-level JSON object `{}` or array `[]`.
 
 A config needs at least one endpoint, and each endpoint exactly one of `payload_inline`
-and `payload_file`; otherwise the server refuses to start and says why. Other fields,
-such as `headers`, are ignored (see [Limitations](#limitations)).
+and `payload_file`. Every payload file must exist and hold valid JSON (UTF-8). Otherwise
+the server refuses to start and says why, listing every problem. Other fields, such as
+`headers`, are ignored (see [Limitations](#limitations)).
 
 `payload_file` paths are resolved relative to the directory the server is started from,
 not to the config file. Start it from the directory that holds `payloads/` (the project
@@ -243,7 +244,7 @@ Response: 404 (no match for POST /api/nonexistent)
 
 ### Request Matching
 
-- **Method**: Case-sensitive, must be uppercase (GET, POST, PUT, DELETE)
+- **Method**: Case-sensitive: GET, POST, PUT, DELETE, PATCH, HEAD or OPTIONS, in uppercase
 - **Path**: Exact string match, trailing slashes matter (`/api/users` ≠ `/api/users/`)
 - **Query parameters**: Displayed in logs but ignored for matching
 - **Headers**: Logged but not used for matching
@@ -256,7 +257,11 @@ Response: 404 (no match for POST /api/nonexistent)
   - `204 No Content` responses omit Content-Type header and have empty body
   - `HEAD` requests return same headers as corresponding GET but with no response body
 - **Unmatched requests**: Return HTTP 404 with `{"error": "endpoint not found"}`
-- **Missing payload files**: Application crashes with error description (attention to config correctness forced intentionally)
+- **Payload files**: Checked at startup: the server refuses to run if one is missing,
+  unreadable or not valid JSON. They are read again on every request, so an edit takes
+  effect at once, without a restart. A file that disappears or stops being valid JSON
+  while the server runs gets that request a `500` with a plain-text body and a traceback
+  in the log, and the server keeps serving.
 - **Delays**: Interruptible: Ctrl+C or SIGTERM during a delay stops the server at once, and that request's connection is closed without a response
 
 ### URL Encoding
@@ -523,8 +528,9 @@ The image runs `httpmocker -p 8080 -c /app/config.json` in the working directory
   example `-p 9000:8080`.
 - **Permissions**: the server runs as an unprivileged user, so the mounted files must be
   readable by others and the directories searchable (`chmod 644` and `755`). A config
-  created under a strict umask fails with `Permission denied: '/app/config.json'`, and a
-  payload directory the server cannot enter shows up as missing payload files.
+  created under a strict umask fails with `Permission denied: '/app/config.json'`, a
+  payload file the server cannot read is reported as `cannot be read (Permission denied)`,
+  and a payload directory it cannot enter shows up as missing payload files.
 
 To validate a config without starting the server, run the CLI with the same mounts:
 

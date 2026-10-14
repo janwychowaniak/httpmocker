@@ -5,6 +5,7 @@ import tempfile
 import pytest
 
 from httpmocker.config_loader import (
+    SUPPORTED_METHODS,
     Config,
     Endpoint,
     _validate_payload_files,
@@ -65,6 +66,24 @@ class TestEndpoint:
         assert endpoint.delay_ms == 0
         assert endpoint.payload_file == "payloads/user.json"
         assert endpoint.payload_inline is None
+
+    @pytest.mark.parametrize("method", SUPPORTED_METHODS)
+    def test_supported_methods_accepted(self, method):
+        """Test that every method the server routes is accepted."""
+        endpoint = Endpoint(method=method, path="/a", status=200, delay_ms=0, payload_inline={})
+        assert endpoint.method == method
+
+    @pytest.mark.parametrize("method", ["PURGE", "TRACE", "CONNECT"])
+    def test_unsupported_method_rejected(self, method):
+        """Test that a method the server does not route is rejected: it could never match."""
+        with pytest.raises(ValueError, match="HTTP method must be one of GET, POST"):
+            Endpoint(method=method, path="/a", status=200, delay_ms=0, payload_inline={})
+
+    @pytest.mark.parametrize("path", ["api/test", ""])
+    def test_path_must_start_with_slash(self, path):
+        """Test that a path without a leading slash is rejected: no request path matches it."""
+        with pytest.raises(ValueError, match="Path must start with '/'"):
+            Endpoint(method="GET", path=path, status=200, delay_ms=0, payload_inline={})
 
     def test_method_must_be_uppercase(self):
         """Test that HTTP method must be uppercase."""
@@ -318,6 +337,61 @@ class TestValidatePayloadFiles:
             _validate_payload_files(config)
         assert exc_info.value.code == 1
 
+    def test_validate_invalid_json_file(self, tmp_path, capsys):
+        """Test that a payload file that is not valid JSON stops the server at startup."""
+        payload_file = tmp_path / "broken.json"
+        payload_file.write_text("{broken")
+        endpoint = Endpoint(
+            method="GET", path="/a", status=200, delay_ms=0, payload_file=str(payload_file)
+        )
+
+        with pytest.raises(SystemExit) as exc_info:
+            _validate_payload_files(Config(endpoints=[endpoint]))
+        assert exc_info.value.code == 1
+        out = capsys.readouterr().out
+        assert "Invalid payload files" in out
+        assert f"{payload_file}: not valid JSON" in out
+
+    def test_validate_non_utf8_file(self, tmp_path, capsys):
+        """Test that a payload file that is not UTF-8 text is reported."""
+        payload_file = tmp_path / "latin1.json"
+        payload_file.write_bytes('{"name": "Zażółć"}'.encode("iso-8859-2"))
+        endpoint = Endpoint(
+            method="GET", path="/a", status=200, delay_ms=0, payload_file=str(payload_file)
+        )
+
+        with pytest.raises(SystemExit):
+            _validate_payload_files(Config(endpoints=[endpoint]))
+        assert f"{payload_file}: not UTF-8 text" in capsys.readouterr().out
+
+    def test_validate_unreadable_file(self, tmp_path, capsys):
+        """Test that a payload path that exists but cannot be read is reported."""
+        endpoint = Endpoint(
+            method="GET", path="/a", status=200, delay_ms=0, payload_file=str(tmp_path)
+        )
+
+        with pytest.raises(SystemExit) as exc_info:
+            _validate_payload_files(Config(endpoints=[endpoint]))
+        assert exc_info.value.code == 1
+        assert f"{tmp_path}: cannot be read (Is a directory)" in capsys.readouterr().out
+
+    def test_validate_reports_missing_and_invalid_together(self, tmp_path, capsys):
+        """Test that all problems are reported at once, a shared file only once."""
+        broken = tmp_path / "broken.json"
+        broken.write_text("[1, 2")
+        missing = str(tmp_path / "missing.json")
+        endpoints = [
+            Endpoint(method="GET", path="/a", status=200, delay_ms=0, payload_file=str(broken)),
+            Endpoint(method="HEAD", path="/a", status=200, delay_ms=0, payload_file=str(broken)),
+            Endpoint(method="GET", path="/b", status=200, delay_ms=0, payload_file=missing),
+        ]
+
+        with pytest.raises(SystemExit):
+            _validate_payload_files(Config(endpoints=endpoints))
+        out = capsys.readouterr().out
+        assert f"Missing payload files:\n  - {missing}\n" in out
+        assert out.count(str(broken)) == 1
+
     def test_validate_inline_payloads_only(self):
         """Test validation with only inline payloads (no files to check)."""
         endpoint = Endpoint(
@@ -391,12 +465,12 @@ class TestEdgeCases:
         )
         assert endpoint.delay_ms == 60000
 
-    def test_endpoint_with_empty_path(self):
-        """Test endpoint with empty path."""
+    def test_endpoint_with_root_path(self):
+        """Test endpoint with the root path."""
         endpoint = Endpoint(
-            method="GET", path="", status=200, delay_ms=0, payload_inline={"root": True}
+            method="GET", path="/", status=200, delay_ms=0, payload_inline={"root": True}
         )
-        assert endpoint.path == ""
+        assert endpoint.path == "/"
 
     def test_endpoint_with_complex_path(self):
         """Test endpoint with complex path including special characters."""

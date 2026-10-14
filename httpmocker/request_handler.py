@@ -4,7 +4,7 @@ from typing import Any
 
 from bottle import Bottle, request, response
 
-from .config_loader import Config, Endpoint, load_payload_file
+from .config_loader import SUPPORTED_METHODS, Config, Endpoint, load_payload_file
 from .console_formatter import (
     format_payload_source,
     log_request_received,
@@ -34,7 +34,7 @@ def create_app(config: Config) -> Bottle:
         key = (endpoint.method, endpoint.path)
         endpoint_map[key] = endpoint
 
-    @app.route("/<path:path>", method=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
+    @app.route("/<path:path>", method=list(SUPPORTED_METHODS))
     def handle_request(path: str) -> dict[str, Any] | str:
         """Handle all HTTP requests and match against configured endpoints."""
         # Reconstruct full path with leading slash
@@ -55,7 +55,7 @@ def create_app(config: Config) -> Bottle:
         return _handle_unmatched_request(request.method, full_path)
 
     # Handle root path separately
-    @app.route("/", method=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
+    @app.route("/", method=list(SUPPORTED_METHODS))
     def handle_root() -> dict[str, Any] | str:
         """Handle requests to root path."""
         client_address = f"{request.environ.get('REMOTE_ADDR', 'unknown')}:{request.environ.get('REMOTE_PORT', 'unknown')}"

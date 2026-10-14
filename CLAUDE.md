@@ -181,13 +181,17 @@ The application follows a clean separation of concerns with four main modules:
 
 2. **`config_loader.py`** - Configuration management
    - Pydantic models for validation (`Endpoint`, `Config`)
-   - Strict validation: HTTP methods must be uppercase, status codes 100-599, non-negative delays
+   - Strict validation: HTTP methods must be uppercase and one of `SUPPORTED_METHODS` (the
+     seven the server routes), paths must start with `/`, status codes 100-599,
+     non-negative delays
    - Each endpoint requires exactly one of `payload_inline` or `payload_file`
-   - Validates payload files exist at startup
+   - Validates at startup that payload files exist and hold valid JSON, reporting every
+     problem at once
    - All errors result in `SystemExit(1)` with clean error messages
 
 3. **`request_handler.py`** - HTTP request processing
-   - Creates Bottle application with endpoint routing
+   - Creates Bottle application with endpoint routing for `SUPPORTED_METHODS`; Bottle
+     answers any other method with its own 405 HTML page
    - Uses dictionary lookup for fast endpoint matching: `(method, path) -> Endpoint`
    - Implements interruptible delays using chunked sleep (100ms chunks)
    - Handles HTTP semantics correctly:
@@ -195,7 +199,9 @@ The application follows a clean separation of concerns with four main modules:
      - `HEAD` requests: same headers as GET, but empty body with Content-Length set
    - Unmatched requests return 404 with `{"error": "endpoint not found"}`
    - Query parameters are logged but ignored for matching
-   - Missing payload files crash intentionally (fail-fast principle)
+   - Payload files are read on every request, so edits apply without a restart; one that
+     disappears or breaks while the server runs gets a 500 from wsgiref (plain text,
+     traceback in the log) and the server keeps serving
 
 4. **`console_formatter.py`** - Rich console output
    - Uses the `rich` library for colored, formatted logging
@@ -219,7 +225,9 @@ The application follows a clean separation of concerns with four main modules:
 
 - **Exact matching only**: Paths must match exactly (trailing slashes matter, `/api/users` ≠ `/api/users/`)
 - **No templating or dynamic routing**: Static configuration for predictable behavior
-- **Fail-fast on errors**: Missing payload files crash the application rather than returning 500s
+- **Fail-fast on config errors**: a config the server could not serve (unsupported method,
+  path without a leading `/`, missing or invalid payload file) stops it at startup rather
+  than surfacing later as failed requests
 - **URL decoding**: Bottle automatically decodes URL-encoded paths (configure paths in decoded form)
 - **Interruptible delays**: Ctrl+C or SIGTERM during a delay stops the server at once; the
   interrupted connection is closed without a response (chunked sleep implementation)
@@ -228,8 +236,8 @@ The application follows a clean separation of concerns with four main modules:
 ### Configuration Structure
 
 Each endpoint in the config file requires:
-- `method` (string): Uppercase HTTP method (GET, POST, PUT, DELETE, etc.)
-- `path` (string): Exact path including leading slash
+- `method` (string): Uppercase HTTP method: GET, POST, PUT, DELETE, PATCH, HEAD or OPTIONS
+- `path` (string): Exact path, starting with `/`
 - `status` (integer): HTTP status code (100-599)
 - `delay_ms` (integer): Response delay in milliseconds (≥0)
 - `payload_inline` (object or array) OR `payload_file` (string): Response body
@@ -237,7 +245,7 @@ Each endpoint in the config file requires:
 ### Testing Philosophy
 
 The codebase includes comprehensive unit tests organized by module:
-- `tests/test_config_loader.py` - Pydantic validation, config loading (valid/invalid JSON), payload file validation, and edge cases (zero delays, complex paths, multiple endpoints)
+- `tests/test_config_loader.py` - Pydantic validation (including supported methods and the leading slash), config loading (valid/invalid JSON), payload file validation (missing, unreadable, invalid JSON), and edge cases (zero delays, complex paths, multiple endpoints)
 - `tests/test_request_handler.py` - the WSGI app: endpoint matching, method/status handling, HTTP semantics (204, HEAD), payload files (object/array), and delays
 - `tests/test_console_formatter.py` - payload-source formatting, request/response logging, and lifecycle banners
 - `tests/test_main.py` - CLI argument parsing, port-availability checks (including a port left in TIME_WAIT), the `--validate-config` path, shutdown on SIGTERM, and the request handler (client port, interrupted requests)

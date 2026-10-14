@@ -172,7 +172,7 @@ def main() -> None:
         if args.validate_config:
             print(f"✓ Configuration file '{args.config}' is valid")
             print(f"✓ Found {len(config.endpoints)} endpoint(s)")
-            print("✓ All payload files exist")
+            print("✓ All payload files exist and hold valid JSON")
             return
 
         # Check if port is available

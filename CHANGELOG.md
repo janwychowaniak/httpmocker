@@ -13,6 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Every existing config stays valid; an inline value that is neither an object nor
   an array is still rejected.
 
+### Changed
+- Config validation, at startup and with `--validate-config`, now rejects endpoints
+  the server could never serve, where it used to accept them silently:
+  - a method other than GET, POST, PUT, DELETE, PATCH, HEAD and OPTIONS, the ones the
+    server routes (a request with it got Bottle's 405 HTML page);
+  - a path that does not start with `/`, which no request path matches;
+  - a payload file that is not valid JSON, not UTF-8 or cannot be read (every request
+    to it got a 500); before, only its existence was checked.
+
+  Every problem is reported at once, a file shared by several endpoints only once. A
+  config this rejects had endpoints that could never respond as configured.
+
 ## [0.1.1] - 2026-10-14
 
 `ghcr.io/janwychowaniak/httpmocker@sha256:e23073c2adf77d3fd84e362af3fad1005fc83fb7c79d713d8e3a8d8e09df42b4`

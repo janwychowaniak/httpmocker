@@ -6,6 +6,10 @@ from pydantic import BaseModel, Field, field_validator
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+# The methods the server routes. Bottle answers any other method with its own
+# 405 page, so an endpoint configured with one could never be matched.
+SUPPORTED_METHODS = ("GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS")
+
 
 class Endpoint(BaseModel):
     """Configuration model for a single API endpoint."""
@@ -22,9 +26,20 @@ class Endpoint(BaseModel):
     @field_validator("method")
     @classmethod
     def validate_method(cls, v: str) -> str:
-        """Ensure HTTP method is uppercase."""
+        """Ensure HTTP method is uppercase and one the server routes."""
         if not v.isupper():
             raise ValueError(f"HTTP method must be uppercase, got: {v}")
+        if v not in SUPPORTED_METHODS:
+            supported = ", ".join(SUPPORTED_METHODS)
+            raise ValueError(f"HTTP method must be one of {supported}, got: {v}")
+        return v
+
+    @field_validator("path")
+    @classmethod
+    def validate_path(cls, v: str) -> str:
+        """Ensure path starts with '/', as every request path does."""
+        if not v.startswith("/"):
+            raise ValueError(f"Path must start with '/', got: {v!r}")
         return v
 
     @field_validator("status")
@@ -123,24 +138,45 @@ def load_config(config_path: str) -> Config:
 
 def _validate_payload_files(config: Config) -> None:
     """
-    Validate that all referenced payload files exist.
+    Validate that all referenced payload files exist and hold valid JSON.
+
+    The server reads them again on every request; checking them here stops it
+    at startup instead of failing each request to a broken file with a 500.
 
     Args:
         config: Validated configuration object
 
     Raises:
-        SystemExit: If any payload file is missing
+        SystemExit: If any payload file is missing, unreadable or not valid JSON
     """
     missing_files: list[str] = []
+    invalid_files: list[str] = []
 
-    for endpoint in config.endpoints:
-        if endpoint.payload_file and not os.path.exists(endpoint.payload_file):
-            missing_files.append(endpoint.payload_file)
+    # A file shared by several endpoints is checked and reported once
+    file_paths = [e.payload_file for e in config.endpoints if e.payload_file is not None]
+    for file_path in dict.fromkeys(file_paths):
+        if not os.path.exists(file_path):
+            missing_files.append(file_path)
+            continue
+        try:
+            with open(file_path, encoding="utf-8") as f:
+                json.load(f)
+        except json.JSONDecodeError as e:
+            invalid_files.append(f"{file_path}: not valid JSON ({e})")
+        except UnicodeDecodeError:
+            invalid_files.append(f"{file_path}: not UTF-8 text")
+        except OSError as e:
+            invalid_files.append(f"{file_path}: cannot be read ({e.strerror})")
 
     if missing_files:
         print("Error: Missing payload files:")
         for file_path in missing_files:
             print(f"  - {file_path}")
+    if invalid_files:
+        print("Error: Invalid payload files:")
+        for problem in invalid_files:
+            print(f"  - {problem}")
+    if missing_files or invalid_files:
         raise SystemExit(1)
 
 
