@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.1] - 2026-10-14
 
+`ghcr.io/janwychowaniak/httpmocker@sha256:e23073c2adf77d3fd84e362af3fad1005fc83fb7c79d713d8e3a8d8e09df42b4`
+
+Image Id `sha256:2032379dbcb0d68ca4525e6d61d26d31d4a0230fd87de7a50c90b9471be32cde`, after a
+pull and after `docker load` of the release file alike. Python 3.14.8, on the same base
+image as 0.1.0. The digest was read from the workflow's push and from a pull of the tag; the
+image can be pulled without logging in. On the published image `docker stop` ends the server
+in about 0.3 seconds with exit code 0, idle or in the middle of a response delay.
+
 ### Added
 - README: a quick start with the published Docker image that needs no clone; how
   the container finds the config and the payload files (working directory, port,
