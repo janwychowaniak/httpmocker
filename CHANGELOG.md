@@ -32,6 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   defined, logged a traceback and kept serving until a second signal, so a
   `docker stop` in the middle of a delay still ended in a kill after 10 seconds.
   The interrupted connection is now closed without a response.
+- Restarting the server on the same port no longer fails with "Port … already in
+  use" for up to a minute after it served a request. The port check before startup
+  bound without `SO_REUSEADDR`, so the closed connections the stopped server had
+  left in TIME_WAIT made the port look busy, although the server itself binds over
+  them. A port another process listens on is still reported.
 
 ## [0.1.0] - 2026-10-14
 

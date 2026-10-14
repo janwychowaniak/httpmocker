@@ -10,6 +10,7 @@ import http.client
 import json
 import signal
 import socket
+import sys
 import threading
 import time
 from wsgiref.simple_server import WSGIRequestHandler, make_server
@@ -62,9 +63,11 @@ class TestCheckPortAvailable:
         check_port_available(port)
 
     def test_port_in_use_exits(self):
+        # A server listening on the port, bound the way the server binds.
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(("0.0.0.0", 0))
+        sock.listen()
         port = sock.getsockname()[1]
         try:
             with pytest.raises(SystemExit) as exc_info:
@@ -72,6 +75,29 @@ class TestCheckPortAvailable:
             assert exc_info.value.code == 1
         finally:
             sock.close()
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="Windows does not block the bind")
+    def test_port_left_in_time_wait_passes(self):
+        """A stopped server's connections stay in TIME_WAIT for a minute; the
+        server binds over them, so a restart must not report the port in use."""
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server.bind(("0.0.0.0", 0))
+        server.listen()
+        port = server.getsockname()[1]
+        # Serve one connection as wsgiref does: the server closes it first, so
+        # it is left in TIME_WAIT once the client closes too.
+        client = socket.create_connection(("127.0.0.1", port))
+        conn, _ = server.accept()
+        conn.close()
+        client.recv(1)
+        client.close()
+        server.close()
+        # The connection in TIME_WAIT blocks a plain bind to the port...
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as plain, pytest.raises(OSError):
+            plain.bind(("0.0.0.0", port))
+        # ...but not the check.
+        check_port_available(port)
 
 
 class TestMainValidateConfig:

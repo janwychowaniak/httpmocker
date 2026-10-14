@@ -52,6 +52,12 @@ def check_port_available(port: int) -> None:
     """
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            # Bind as the server does, with SO_REUSEADDR: the connections a
+            # stopped server leaves in TIME_WAIT for a minute do not make the
+            # port busy. On Windows SO_REUSEADDR would bind even over a
+            # listening socket, so the check would miss a real conflict.
+            if sys.platform != "win32":
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             sock.bind(("0.0.0.0", port))
     except OSError:
         print(f"Error: Port {port} already in use")
