@@ -53,6 +53,8 @@ python -m httpmocker -p 8080 -c configs/config.json  # 2. Run the mock server
 curl http://localhost:8080/api/users                 # 3. Test with curl
 ```
 
+Only have the Docker image? See [Quick start with the published image](#quick-start-with-the-published-image).
+
 ## Usage
 
 ```bash
@@ -125,12 +127,21 @@ Each endpoint requires:
 
 - **method** (string): HTTP method in uppercase (GET, POST, PUT, DELETE, etc.)
 - **path** (string): Exact path to match (case-sensitive, trailing slash matters)
-- **status** (integer): HTTP status code to return
-- **delay_ms** (integer): Response delay in milliseconds
+- **status** (integer): HTTP status code to return, from 100 to 599
+- **delay_ms** (integer): Response delay in milliseconds, 0 or more
 - **payload_inline** (object) OR **payload_file** (string): Response body content
 
 **Note:**
 Use _either_ `payload_inline` for simple JSON objects _or_ `payload_file` for complex responses stored in separate files.
+
+A config needs at least one endpoint, and each endpoint exactly one of `payload_inline`
+and `payload_file`; otherwise the server refuses to start and says why. Other fields,
+such as `headers`, are ignored (see [Limitations](#limitations)).
+
+`payload_file` paths are resolved relative to the directory the server is started from,
+not to the config file. Start it from the directory that holds `payloads/` (the project
+root here) and write the paths as `payloads/<file>.json`. The Docker image follows the same
+rule; see [How the container sees your files](#how-the-container-sees-your-files).
 
 ## Example Payloads
 
@@ -253,6 +264,23 @@ Response: 404 (no match for POST /api/nonexistent)
 
 Bottle automatically decodes URL-encoded paths, so configure paths in decoded form:
 - URL: `/api/users%20test` → Config path: `/api/users test`
+
+### Limitations
+
+httpmocker serves static JSON responses and nothing else, by design:
+
+- **JSON only**: every response body is JSON sent as `application/json`; there are no
+  custom response headers and no other content types.
+- **Static responses**: no templating, no responses that depend on the request, and no
+  state (such as a different response to the second call).
+- **Exact matching only**: no wildcards, path parameters or regular expressions.
+- **One request at a time**: the server is single-threaded, so while one response waits
+  out its `delay_ms`, every other request waits as well, whatever its endpoint.
+- **Plain HTTP**: no TLS and no authentication. The server listens on all interfaces
+  (`0.0.0.0`), so when started from the CLI it is reachable from your network, not only
+  from localhost.
+- **Console logging only**: requests and responses are logged to standard output, not
+  to a file.
 
 ## Project Structure
 
@@ -419,10 +447,124 @@ Or build it yourself:
 docker build -t httpmocker:latest .
 ```
 
-The examples below use the locally built `httpmocker:latest`; substitute
-`ghcr.io/janwychowaniak/httpmocker:<version>` to run the published image.
+### Quick start with the published image
+
+No clone is needed. Lay out a directory the way the repo does, with the config in
+`configs/` and the payload files in `payloads/`, and mount both into the container:
+
+```bash
+mkdir -p mymock/configs mymock/payloads && cd mymock
+
+cat > configs/config.json <<'EOF'
+{
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/users",
+      "status": 200,
+      "payload_file": "payloads/users.json",
+      "delay_ms": 0
+    },
+    {
+      "method": "POST",
+      "path": "/api/login",
+      "status": 401,
+      "payload_inline": {"error": "invalid_credentials"},
+      "delay_ms": 100
+    }
+  ]
+}
+EOF
+
+cat > payloads/users.json <<'EOF'
+[{"id": 1, "username": "alice"}, {"id": 2, "username": "bob"}]
+EOF
+
+docker run -d --name httpmocker -p 8080:8080 \
+  -v $(pwd)/configs/config.json:/app/config.json:ro \
+  -v $(pwd)/payloads:/app/payloads:ro \
+  ghcr.io/janwychowaniak/httpmocker:0.1.0
+```
+
+The server is up about a second later:
+
+```bash
+curl http://localhost:8080/api/users
+curl -X POST http://localhost:8080/api/login -d '{"username": "test"}'
+```
+
+The request log, httpmocker's main output, is the container's output (add `-t` to
+`docker run` to keep its colors):
+
+```bash
+docker logs -f httpmocker     # Ctrl+C stops following the log, not the server
+```
+
+If the container exits right after it starts, `docker logs httpmocker` says why: usually
+a config error, or a file the server cannot find or read (see below). Stop and remove
+the container when you are done:
+
+```bash
+docker stop httpmocker && docker rm httpmocker
+```
+
+### How the container sees your files
+
+The image runs `httpmocker -p 8080 -c /app/config.json` in the working directory `/app`:
+
+- **The config** is read from `/app/config.json`. Mount an existing file there: if the
+  source path does not exist, Docker creates an empty directory in its place and the
+  server fails with `Is a directory`.
+- **Payload files** are resolved relative to `/app`, not to the config file, so
+  `"payload_file": "payloads/users.json"` reads `/app/payloads/users.json`. Mount your
+  payload directory at `/app/payloads` and write the paths as `payloads/<file>.json`; the
+  same config then also works with the CLI started from the directory that holds
+  `payloads/`. A path such as `data/users.json` would need a mount at `/app/data`.
+- **The port** inside the container is always 8080; pick the host port with `-p`, for
+  example `-p 9000:8080`.
+- **Permissions**: the server runs as an unprivileged user, so the mounted files must be
+  readable by others and the directories searchable (`chmod 644` and `755`). A config
+  created under a strict umask fails with `Permission denied: '/app/config.json'`, and a
+  payload directory the server cannot enter shows up as missing payload files.
+
+To validate a config without starting the server, run the CLI with the same mounts:
+
+```bash
+docker run --rm \
+  -v $(pwd)/configs/config.json:/app/config.json:ro \
+  -v $(pwd)/payloads:/app/payloads:ro \
+  ghcr.io/janwychowaniak/httpmocker:0.1.0 \
+  httpmocker -p 8080 -c /app/config.json --validate-config
+```
+
+To keep several configs at hand, mount the whole `configs/` directory and name the one to
+use (relative to `/app`, like the payload paths):
+
+```bash
+docker run -d --name httpmocker -p 8080:8080 \
+  -v $(pwd)/configs:/app/configs:ro \
+  -v $(pwd)/payloads:/app/payloads:ro \
+  ghcr.io/janwychowaniak/httpmocker:0.1.0 \
+  httpmocker -p 8080 -c configs/staging.json
+```
+
+With Docker Compose, the quick start's container reads:
+
+```yaml
+services:
+  httpmocker:
+    image: ghcr.io/janwychowaniak/httpmocker:0.1.0
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./configs/config.json:/app/config.json:ro
+      - ./payloads:/app/payloads:ro
+```
 
 ### Running with Docker
+
+The examples below use the locally built `httpmocker:latest`; substitute
+`ghcr.io/janwychowaniak/httpmocker:<version>` to run the published image.
 
 **Basic usage:**
 ```bash
@@ -456,7 +598,7 @@ cp docker-compose.example.yml docker-compose.yml
 
 # Edit docker-compose.yml to add your services
 # Then run:
-docker-compose up
+docker compose up
 ```
 
 ### Docker Examples

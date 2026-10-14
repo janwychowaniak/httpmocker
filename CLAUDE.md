@@ -147,7 +147,8 @@ since re-running the whole workflow builds and pushes again.
 
 Every release, in this order:
 1. Set `__version__` in `httpmocker/__init__.py`, move `[Unreleased]` in `CHANGELOG.md` to
-   `[X.Y.Z] - YYYY-MM-DD`, and update the version in the README's release examples.
+   `[X.Y.Z] - YYYY-MM-DD`, and update the version wherever the README names it (the
+   release and Docker examples).
 2. Push, and wait for CI to be green on that commit.
 3. Tag it with the notes as its message and push the tag:
    `git tag -a vX.Y.Z -F notes.txt && git push origin vX.Y.Z`. Git's default clean-up

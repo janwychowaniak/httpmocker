@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- README: a quick start with the published Docker image that needs no clone; how
+  the container finds the config and the payload files (working directory, port,
+  permissions); validating a config through the image; a Compose service on the
+  published image; the config validation rules; and a Limitations section, which
+  notes among other things that the server handles one request at a time.
+
 ### Fixed
 - `docker stop` now shuts the server down cleanly, as Ctrl+C does. The image runs
   the server as PID 1, where a SIGTERM without a handler is ignored, so Docker
