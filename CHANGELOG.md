@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   published image; the config validation rules; and a Limitations section, which
   notes among other things that the server handles one request at a time.
 
+### Changed
+- `.gitignore` ignores user payload files in `payloads/` as it already ignored user
+  configs in `configs/`, so only the shipped examples stay tracked.
+- `.dockerignore` keeps `configs/`, `payloads/` and the mypy and ruff caches out of
+  the build context (33 MB down to under 400 kB), in place of an entry for an example
+  config that no longer exists. The image itself is unchanged.
+
 ### Fixed
 - `docker stop` now shuts the server down cleanly, as Ctrl+C does. The image runs
   the server as PID 1, where a SIGTERM without a handler is ignored, so Docker

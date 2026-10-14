@@ -45,6 +45,10 @@ venv.bak/
 .coverage
 htmlcov/
 
+# Linter and type-checker caches
+.mypy_cache/
+.ruff_cache/
+
 # Development files
 tests/
 
@@ -52,9 +56,9 @@ tests/
 # NOTE: README.md is required at build time (referenced by pyproject metadata).
 LICENSE
 
-# Example files (users will mount their own)
-config_example.json
-payloads/example.json
+# Configs and payloads: mounted at run time, never part of the image
+configs/
+payloads/
 
 # Docker
 Dockerfile
@@ -65,8 +69,6 @@ docker-compose.example.yml
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # --------------- AI -------------------------
-
-.ai/
 
 # Aider
 .aider.chat.history.md
