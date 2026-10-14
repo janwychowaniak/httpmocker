@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Every problem is reported at once, a file shared by several endpoints only once. A
   config this rejects had endpoints that could never respond as configured.
+- `docker-compose.example.yml` drops the obsolete `version` key, for which
+  `docker compose` printed a warning on every run.
 
 ### Fixed
 - The README and CLAUDE.md said a `HEAD` request gets the headers of the `GET` endpoint
