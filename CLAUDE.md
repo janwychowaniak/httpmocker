@@ -96,7 +96,8 @@ mypy httpmocker/
 
 The package is fully type-annotated and ships a `py.typed` marker. mypy runs in
 `strict` mode with the pydantic plugin; `bottle` has no type information, so its
-import is exempted via a per-module override in `pyproject.toml`.
+import is exempted via a per-module override in `pyproject.toml`, and a second
+override lets `request_handler` register its routes with Bottle's untyped decorator.
 
 ### Pre-commit Hooks
 
@@ -187,7 +188,8 @@ The application follows a clean separation of concerns with four main modules:
    - Each endpoint requires exactly one of `payload_inline` or `payload_file`
    - Validates at startup that payload files exist and hold valid JSON, reporting every
      problem at once
-   - All errors result in `SystemExit(1)` with clean error messages
+   - All errors result in `SystemExit(1)` with an error message (pydantic's own report for
+     model validation errors)
 
 3. **`request_handler.py`** - HTTP request processing
    - Creates Bottle application with endpoint routing for `SUPPORTED_METHODS`; Bottle
@@ -196,7 +198,8 @@ The application follows a clean separation of concerns with four main modules:
    - Implements interruptible delays using chunked sleep (100ms chunks)
    - Handles HTTP semantics correctly:
      - `204 No Content`: no Content-Type header, empty body
-     - `HEAD` requests: same headers as GET, but empty body with Content-Length set
+     - `HEAD` requests: match only endpoints configured with method `HEAD` (no fallback to
+       the `GET` endpoint); Content-Type and Content-Length of the payload, empty body
    - Unmatched requests return 404 with `{"error": "endpoint not found"}`
    - Query parameters are logged but ignored for matching
    - Payload files are read on every request, so edits apply without a restart; one that
@@ -206,8 +209,8 @@ The application follows a clean separation of concerns with four main modules:
 4. **`console_formatter.py`** - Rich console output
    - Uses the `rich` library for colored, formatted logging
    - Logs all incoming requests with headers, query strings, and request bodies
-   - Pretty-prints JSON payloads with syntax highlighting
-   - Shows matched endpoint configuration and response timing
+   - Pretty-prints JSON request bodies with syntax highlighting
+   - Shows the matched endpoint's configuration (status, payload source, delay)
    - Startup banner and graceful shutdown messages
 
 ### Data Flow
@@ -271,7 +274,7 @@ When adding features, follow the existing test structure with descriptive docstr
 ```bash
 curl -X GET http://localhost:8080/api/users
 curl -X POST http://localhost:8080/api/login -d '{"username":"test"}'
-curl -I http://localhost:8080/api/users  # HEAD request
+curl -I http://localhost:8080/api/users  # HEAD: configs/example.json has a HEAD endpoint for it
 ```
 
 ## Dependencies
@@ -331,6 +334,7 @@ httpmocker/
 ├── .gitleaks.toml              # gitleaks rules (defaults + add-on provider rules)
 ├── pyproject.toml              # Packaging, dependencies & tooling config
 ├── uv.lock                     # Fully-pinned dependency lockfile
+├── smoke-tests.md              # curl calls for every endpoint of configs/example.json
 ├── .gitignore
 ├── CHANGELOG.md                # Notable changes
 ├── README.md                   # User-facing documentation

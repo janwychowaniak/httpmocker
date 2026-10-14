@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Every problem is reported at once, a file shared by several endpoints only once. A
   config this rejects had endpoints that could never respond as configured.
 
+### Fixed
+- The README and CLAUDE.md said a `HEAD` request gets the headers of the `GET` endpoint
+  of its path; it matches only an endpoint configured with `HEAD`, and they now say so.
+  They also said every response is JSON, while the `405` page for an unsupported method
+  and the `500` page for a payload file that breaks at run time are not; the README's
+  Limitations now name both. The README also describes the image's health check, and
+  both list `smoke-tests.md` in the project structure.
+
 ## [0.1.1] - 2026-10-14
 
 `ghcr.io/janwychowaniak/httpmocker@sha256:e23073c2adf77d3fd84e362af3fad1005fc83fb7c79d713d8e3a8d8e09df42b4`

@@ -255,8 +255,11 @@ Response: 404 (no match for POST /api/nonexistent)
 - **JSON Support**: Both JSON objects `{}` and JSON arrays `[]` are supported as top-level responses, inline or from a file
 - **HTTP Semantics**:
   - `204 No Content` responses omit Content-Type header and have empty body
-  - `HEAD` requests return same headers as corresponding GET but with no response body
-- **Unmatched requests**: Return HTTP 404 with `{"error": "endpoint not found"}`
+  - `HEAD` requests match only endpoints configured with method `HEAD`, not the `GET`
+    endpoint of the same path; they get the Content-Type and Content-Length of their
+    payload, with no body
+- **Unmatched requests**: Return HTTP 404 with `{"error": "endpoint not found"}`; a request
+  with a method other than the seven above gets a `405` instead (see [Limitations](#limitations))
 - **Payload files**: Checked at startup: the server refuses to run if one is missing,
   unreadable or not valid JSON. They are read again on every request, so an edit takes
   effect at once, without a restart. A file that disappears or stops being valid JSON
@@ -273,8 +276,10 @@ Bottle automatically decodes URL-encoded paths, so configure paths in decoded fo
 
 httpmocker serves static JSON responses and nothing else, by design:
 
-- **JSON only**: every response body is JSON sent as `application/json`; there are no
-  custom response headers and no other content types.
+- **JSON only**: every configured response is JSON sent as `application/json`; there are
+  no custom response headers and no other content types. Two responses come from the
+  server itself and are not JSON: a `405` HTML page for a request with any other method,
+  and a `500` plain-text page for a payload file that breaks while the server runs.
 - **Static responses**: no templating, no responses that depend on the request, and no
   state (such as a different response to the second call).
 - **Exact matching only**: no wildcards, path parameters or regular expressions.
@@ -324,6 +329,7 @@ httpmocker/
 ├── .gitleaks.toml              # gitleaks rules (defaults + add-on provider rules)
 ├── pyproject.toml              # Packaging, dependencies & tooling config
 ├── uv.lock                     # Fully-pinned dependency lockfile
+├── smoke-tests.md              # curl calls for every endpoint of configs/example.json
 ├── .gitignore
 ├── CHANGELOG.md                # Notable changes
 ├── README.md                   # User-facing documentation
@@ -392,6 +398,9 @@ A short array can also go inline, as `"payload_inline": [{"id": 1}, {"id": 2}]`.
   ]
 }
 ```
+
+A `HEAD` request needs an endpoint of its own: it does not fall back to the `GET`
+endpoint of the same path.
 
 ### Simulating Slow APIs
 
@@ -526,6 +535,9 @@ The image runs `httpmocker -p 8080 -c /app/config.json` in the working directory
   `payloads/`. A path such as `data/users.json` would need a mount at `/app/data`.
 - **The port** inside the container is always 8080; pick the host port with `-p`, for
   example `-p 9000:8080`.
+- **Health**: the image checks that the server accepts connections on port 8080, so
+  `docker ps` shows the container as `healthy` a few seconds after it starts. The check
+  runs every 30 seconds, and three failures in a row mark the container `unhealthy`.
 - **Permissions**: the server runs as an unprivileged user, so the mounted files must be
   readable by others and the directories searchable (`chmod 644` and `755`). A config
   created under a strict umask fails with `Permission denied: '/app/config.json'`, a
