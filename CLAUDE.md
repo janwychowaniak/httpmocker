@@ -125,7 +125,10 @@ a new rule's `keywords` can suppress built-in detections.
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and on
 pull requests: a lint/format/types job (`ruff check` + `ruff format --check` +
 `mypy`), a dependency-audit job (`pip-audit`), a Docker image scan (Trivy), and a
-test job across Python 3.10–3.14.
+test job across Python 3.10–3.14. Its `concurrency` cancels a run in progress when
+a newer push reaches the same branch, on `main` too, by choice: after several quick
+pushes the earlier runs show as cancelled, and the run of the last pushed commit is
+the one to wait for, since it covers the whole tree.
 
 A separate workflow (`.github/workflows/gitleaks.yml`) scans the full history and
 all commit messages for secrets on every push, pull request and weekly.
@@ -237,7 +240,7 @@ The codebase includes comprehensive unit tests organized by module:
 - `tests/test_config_loader.py` - Pydantic validation, config loading (valid/invalid JSON), payload file validation, and edge cases (zero delays, complex paths, multiple endpoints)
 - `tests/test_request_handler.py` - the WSGI app: endpoint matching, method/status handling, HTTP semantics (204, HEAD), payload files (object/array), and delays
 - `tests/test_console_formatter.py` - payload-source formatting, request/response logging, and lifecycle banners
-- `tests/test_main.py` - CLI argument parsing, port-availability checks, and the `--validate-config` path
+- `tests/test_main.py` - CLI argument parsing, port-availability checks (including a port left in TIME_WAIT), the `--validate-config` path, shutdown on SIGTERM, and the request handler (client port, interrupted requests)
 
 When adding features, follow the existing test structure with descriptive docstrings and organized test classes.
 
