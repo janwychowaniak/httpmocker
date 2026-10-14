@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-14
+
 ### Added
 - README: a quick start with the published Docker image that needs no clone; how
   the container finds the config and the payload files (working directory, port,
@@ -19,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   configs in `configs/`, so only the shipped examples stay tracked.
 - `.dockerignore` keeps `configs/`, `payloads/` and the mypy and ruff caches out of
   the build context (33 MB down to under 400 kB), in place of an entry for an example
-  config that no longer exists. The image itself is unchanged.
+  config that no longer exists. This change alone leaves the image as it was.
 
 ### Fixed
 - `docker stop` now shuts the server down cleanly, as Ctrl+C does. The image runs

@@ -24,7 +24,7 @@ wheel, the sdist and the Docker image archive, with their `SHA256SUMS`. Install 
 straight from the release wheel:
 
 ```bash
-pip install https://github.com/janwychowaniak/httpmocker/releases/download/v0.1.0/httpmocker-0.1.0-py3-none-any.whl
+pip install https://github.com/janwychowaniak/httpmocker/releases/download/v0.1.1/httpmocker-0.1.1-py3-none-any.whl
 ```
 
 The Docker image is also published to GHCR; see [Docker Usage](#docker-usage).
@@ -429,7 +429,7 @@ python -m httpmocker -p 8080 -c configs/staging.json
 Pull the published image from GHCR (tagged with each release version, plus `latest`):
 
 ```bash
-docker pull ghcr.io/janwychowaniak/httpmocker:0.1.0
+docker pull ghcr.io/janwychowaniak/httpmocker:0.1.1
 ```
 
 On a host that cannot reach the registry, download `httpmocker-<version>-image-amd64.tar.gz`
@@ -438,7 +438,7 @@ then verify and load the archive:
 
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
-docker load --input httpmocker-0.1.0-image-amd64.tar.gz
+docker load --input httpmocker-0.1.1-image-amd64.tar.gz
 ```
 
 Or build it yourself:
@@ -483,7 +483,7 @@ EOF
 docker run -d --name httpmocker -p 8080:8080 \
   -v $(pwd)/configs/config.json:/app/config.json:ro \
   -v $(pwd)/payloads:/app/payloads:ro \
-  ghcr.io/janwychowaniak/httpmocker:0.1.0
+  ghcr.io/janwychowaniak/httpmocker:0.1.1
 ```
 
 The server is up about a second later:
@@ -533,7 +533,7 @@ To validate a config without starting the server, run the CLI with the same moun
 docker run --rm \
   -v $(pwd)/configs/config.json:/app/config.json:ro \
   -v $(pwd)/payloads:/app/payloads:ro \
-  ghcr.io/janwychowaniak/httpmocker:0.1.0 \
+  ghcr.io/janwychowaniak/httpmocker:0.1.1 \
   httpmocker -p 8080 -c /app/config.json --validate-config
 ```
 
@@ -544,7 +544,7 @@ use (relative to `/app`, like the payload paths):
 docker run -d --name httpmocker -p 8080:8080 \
   -v $(pwd)/configs:/app/configs:ro \
   -v $(pwd)/payloads:/app/payloads:ro \
-  ghcr.io/janwychowaniak/httpmocker:0.1.0 \
+  ghcr.io/janwychowaniak/httpmocker:0.1.1 \
   httpmocker -p 8080 -c configs/staging.json
 ```
 
@@ -553,7 +553,7 @@ With Docker Compose, the quick start's container reads:
 ```yaml
 services:
   httpmocker:
-    image: ghcr.io/janwychowaniak/httpmocker:0.1.0
+    image: ghcr.io/janwychowaniak/httpmocker:0.1.1
     ports:
       - "8080:8080"
     volumes:
