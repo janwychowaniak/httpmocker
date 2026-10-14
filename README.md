@@ -126,7 +126,7 @@ Example output:
 Each endpoint requires:
 
 - **method** (string): HTTP method in uppercase: GET, POST, PUT, DELETE, PATCH, HEAD or OPTIONS
-- **path** (string): Exact path to match, starting with `/` (case-sensitive, trailing slash matters)
+- **path** (string): Exact path to match, starting with `/`, without `?` or `#` (case-sensitive, trailing slash matters)
 - **status** (integer): HTTP status code to return, from 100 to 599
 - **delay_ms** (integer): Response delay in milliseconds, 0 or more
 - **payload_inline** (object or array) OR **payload_file** (string): Response body content
@@ -246,7 +246,9 @@ Response: 404 (no match for POST /api/nonexistent)
 
 - **Method**: Case-sensitive: GET, POST, PUT, DELETE, PATCH, HEAD or OPTIONS, in uppercase
 - **Path**: Exact string match, trailing slashes matter (`/api/users` ≠ `/api/users/`)
-- **Query parameters**: Displayed in logs but ignored for matching
+- **Query parameters**: Displayed in logs but ignored for matching, so `/api/users` also
+  answers `/api/users?filter=active`. A config path therefore cannot contain `?`, nor `#`,
+  since clients do not send the fragment.
 - **Headers**: Logged but not used for matching
 
 ### Response Behavior

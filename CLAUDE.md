@@ -183,8 +183,8 @@ The application follows a clean separation of concerns with four main modules:
 2. **`config_loader.py`** - Configuration management
    - Pydantic models for validation (`Endpoint`, `Config`)
    - Strict validation: HTTP methods must be uppercase and one of `SUPPORTED_METHODS` (the
-     seven the server routes), paths must start with `/`, status codes 100-599,
-     non-negative delays
+     seven the server routes), paths must start with `/` and contain no `?` or `#`,
+     status codes 100-599, non-negative delays
    - Each endpoint requires exactly one of `payload_inline` or `payload_file`
    - Validates at startup that payload files exist and hold valid JSON, reporting every
      problem at once
@@ -229,8 +229,8 @@ The application follows a clean separation of concerns with four main modules:
 - **Exact matching only**: Paths must match exactly (trailing slashes matter, `/api/users` ≠ `/api/users/`)
 - **No templating or dynamic routing**: Static configuration for predictable behavior
 - **Fail-fast on config errors**: a config the server could not serve (unsupported method,
-  path without a leading `/`, missing or invalid payload file) stops it at startup rather
-  than surfacing later as failed requests
+  path without a leading `/` or with a query string, missing or invalid payload file)
+  stops it at startup rather than surfacing later as failed requests
 - **URL decoding**: Bottle automatically decodes URL-encoded paths (configure paths in decoded form)
 - **Interruptible delays**: Ctrl+C or SIGTERM during a delay stops the server at once; the
   interrupted connection is closed without a response (chunked sleep implementation)
@@ -240,7 +240,7 @@ The application follows a clean separation of concerns with four main modules:
 
 Each endpoint in the config file requires:
 - `method` (string): Uppercase HTTP method: GET, POST, PUT, DELETE, PATCH, HEAD or OPTIONS
-- `path` (string): Exact path, starting with `/`
+- `path` (string): Exact path, starting with `/`, without `?` or `#`
 - `status` (integer): HTTP status code (100-599)
 - `delay_ms` (integer): Response delay in milliseconds (≥0)
 - `payload_inline` (object or array) OR `payload_file` (string): Response body
@@ -248,7 +248,7 @@ Each endpoint in the config file requires:
 ### Testing Philosophy
 
 The codebase includes comprehensive unit tests organized by module:
-- `tests/test_config_loader.py` - Pydantic validation (including supported methods and the leading slash), config loading (valid/invalid JSON), payload file validation (missing, unreadable, invalid JSON), and edge cases (zero delays, complex paths, multiple endpoints)
+- `tests/test_config_loader.py` - Pydantic validation (including supported methods and the path rules), config loading (valid/invalid JSON), payload file validation (missing, unreadable, invalid JSON), and edge cases (zero delays, complex paths, multiple endpoints)
 - `tests/test_request_handler.py` - the WSGI app: endpoint matching, method/status handling, HTTP semantics (204, HEAD), payload files (object/array), and delays
 - `tests/test_console_formatter.py` - payload-source formatting, request/response logging, and lifecycle banners
 - `tests/test_main.py` - CLI argument parsing, port-availability checks (including a port left in TIME_WAIT), the `--validate-config` path, shutdown on SIGTERM, and the request handler (client port, interrupted requests)

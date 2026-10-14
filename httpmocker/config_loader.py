@@ -37,9 +37,20 @@ class Endpoint(BaseModel):
     @field_validator("path")
     @classmethod
     def validate_path(cls, v: str) -> str:
-        """Ensure path starts with '/', as every request path does."""
+        """Ensure path looks like a request path: a leading '/', no query or fragment.
+
+        Matching ignores the query string and clients do not send the fragment, so
+        a path with '?' or '#' would only match a request that encodes the
+        character as %3F or %23.
+        """
         if not v.startswith("/"):
             raise ValueError(f"Path must start with '/', got: {v!r}")
+        if "?" in v or "#" in v:
+            base = v.split("?", 1)[0].split("#", 1)[0]
+            raise ValueError(
+                f"Path must not contain '?' or '#', got: {v!r}; query strings and fragments"
+                f" are not part of matching, so use {base!r}, which answers any query string"
+            )
         return v
 
     @field_validator("status")

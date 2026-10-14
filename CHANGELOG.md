@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - a method other than GET, POST, PUT, DELETE, PATCH, HEAD and OPTIONS, the ones the
     server routes (a request with it got Bottle's 405 HTML page);
   - a path that does not start with `/`, which no request path matches;
+  - a path with `?` or `#`: matching ignores the query string and clients do not send
+    the fragment, so `/api/users?filter=active` answered only a request that encoded
+    the `?` as `%3F`, never `/api/users?filter=active` itself;
   - a payload file that is not valid JSON, not UTF-8 or cannot be read (every request
     to it got a 500); before, only its existence was checked.
 

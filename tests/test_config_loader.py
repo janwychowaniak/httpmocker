@@ -85,6 +85,24 @@ class TestEndpoint:
         with pytest.raises(ValueError, match="Path must start with '/'"):
             Endpoint(method="GET", path=path, status=200, delay_ms=0, payload_inline={})
 
+    @pytest.mark.parametrize("path", ["/api/users?filter=active", "/api/users?", "/page#top"])
+    def test_path_must_not_contain_query_or_fragment(self, path):
+        """Test that '?' and '#' are rejected: a request's query string and fragment are
+        never part of its path, so such an endpoint would only match an encoded %3F or %23."""
+        with pytest.raises(ValueError, match=r"Path must not contain '\?' or '#'"):
+            Endpoint(method="GET", path=path, status=200, delay_ms=0, payload_inline={})
+
+    def test_path_with_query_names_the_path_to_use(self):
+        """Test that the error tells which path answers the request instead."""
+        with pytest.raises(ValueError, match="use '/api/users', which answers any query string"):
+            Endpoint(
+                method="GET",
+                path="/api/users?filter=active",
+                status=200,
+                delay_ms=0,
+                payload_inline={},
+            )
+
     def test_method_must_be_uppercase(self):
         """Test that HTTP method must be uppercase."""
         with pytest.raises(ValueError, match="HTTP method must be uppercase"):
@@ -476,12 +494,12 @@ class TestEdgeCases:
         """Test endpoint with complex path including special characters."""
         endpoint = Endpoint(
             method="GET",
-            path="/api/users/123/posts?filter=active&sort=date",
+            path="/api/users/123/posts/2024-01-15_draft.v2;rev=3",
             status=200,
             delay_ms=0,
             payload_inline={"complex": True},
         )
-        assert endpoint.path == "/api/users/123/posts?filter=active&sort=date"
+        assert endpoint.path == "/api/users/123/posts/2024-01-15_draft.v2;rev=3"
 
     def test_config_with_multiple_endpoints(self):
         """Test configuration with multiple endpoints."""
