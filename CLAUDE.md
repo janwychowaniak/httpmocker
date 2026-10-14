@@ -154,11 +154,29 @@ Every release, in this order:
    `[X.Y.Z] - YYYY-MM-DD`, and update the version wherever the README names it (the
    release and Docker examples).
 2. Push, and wait for CI to be green on that commit.
-3. Tag it with the notes as its message and push the tag:
-   `git tag -a vX.Y.Z -F notes.txt && git push origin vX.Y.Z`. Git's default clean-up
-   strips every line that starts with `#`, so the notes carry no Markdown headings.
-4. After the workflow, record the image digest and Id from its summary in
-   `CHANGELOG.md` in a follow-up commit.
+3. Check every claim in the notes against the code, since a pushed tag message cannot be
+   corrected. Then tag the commit with the notes as its message, check that the message
+   is the notes, and push the tag:
+   ```bash
+   git tag -a vX.Y.Z -F notes.txt
+   git cat-file tag vX.Y.Z | sed '1,/^$/d' | diff - notes.txt
+   git push origin vX.Y.Z
+   ```
+   Git's default clean-up strips every line that starts with `#`, so the notes carry no
+   Markdown headings. `git tag -l --format='%(contents)'` prints an extra blank line, so
+   compare with `git cat-file` instead.
+4. After the workflow, check what it published:
+   - the digest in the workflow's summary is the one a pull of the tag gets without
+     logging in (`DOCKER_CONFIG` pointing at a directory whose `config.json` is `{}`);
+   - the release files pass `sha256sum -c SHA256SUMS` after
+     `gh release download vX.Y.Z --dir <dir> --clobber`;
+   - `docker load` of the image archive, after `docker rmi` of the pulled tag, gives the
+     same image Id;
+   - the release body equals the notes;
+   - the release's changes work on the published image.
+
+   Then record under the version's heading in `CHANGELOG.md`, in a follow-up commit, the
+   digest, the image Id, the image's Python version and base image, and what was checked.
 
 A tag is never pushed again, not even to fix its message: that could publish the same
 version under another digest. A wrong line is corrected in `CHANGELOG.md` instead.
@@ -230,7 +248,7 @@ The application follows a clean separation of concerns with four main modules:
 - **Exact matching only**: Paths must match exactly (trailing slashes matter, `/api/users` ≠ `/api/users/`)
 - **No templating or dynamic routing**: Static configuration for predictable behavior
 - **Fail-fast on config errors**: a config the server could not serve (unsupported method,
-  path without a leading `/` or with a query string, missing or invalid payload file)
+  path without a leading `/` or with `?` or `#`, missing or invalid payload file)
   stops it at startup rather than surfacing later as failed requests
 - **URL decoding**: Bottle automatically decodes URL-encoded paths (configure paths in decoded form)
 - **Interruptible delays**: Ctrl+C or SIGTERM during a delay stops the server at once; the
