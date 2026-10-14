@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   waited out its 10-second timeout and killed the process (exit code 137); outside
   a container SIGTERM ended it at once, without the shutdown message. SIGTERM now
   stops the server with exit code 0, which also covers systemd and Kubernetes.
+- Ctrl+C or SIGTERM during a response delay now stops the server at once. The
+  wsgiref server answered the interrupted request with a 500 the config never
+  defined, logged a traceback and kept serving until a second signal, so a
+  `docker stop` in the middle of a delay still ended in a kill after 10 seconds.
+  The interrupted connection is now closed without a response.
 
 ## [0.1.0] - 2026-10-14
 

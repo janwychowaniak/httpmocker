@@ -1,15 +1,18 @@
 """Tests for the CLI entry point in __main__.
 
 The blocking server loop is not exercised; these cover argument parsing, port
-availability checking, the --validate-config path of main(), and shutting the
-server down on SIGTERM.
+availability checking, the --validate-config path of main(), shutting the
+server down on SIGTERM, and the request handler serving single requests,
+interrupted or not.
 """
 
+import http.client
 import json
 import signal
 import socket
+import threading
 import time
-from wsgiref.simple_server import WSGIRequestHandler
+from wsgiref.simple_server import WSGIRequestHandler, make_server
 
 import pytest
 
@@ -151,6 +154,64 @@ class TestMainShutdown:
         # Returns normally: a clean shutdown, not an error exit.
         main()
         assert "httpmocker shutting down" in capsys.readouterr().out
+
+
+def serve_one_request(app, *, interrupted=False):
+    """Serve a single GET with ClientPortRequestHandler; return what the client got.
+
+    With ``interrupted``, serving the request must raise KeyboardInterrupt.
+    """
+    server = make_server("127.0.0.1", 0, app, handler_class=ClientPortRequestHandler)
+    received = []
+
+    def client():
+        conn = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+        try:
+            conn.request("GET", "/a")
+            received.append(conn.getresponse().status)
+        except http.client.RemoteDisconnected:
+            received.append("no response")
+        finally:
+            conn.close()
+
+    thread = threading.Thread(target=client)
+    thread.start()
+    try:
+        if interrupted:
+            with pytest.raises(KeyboardInterrupt):
+                server.handle_request()
+        else:
+            server.handle_request()
+    finally:
+        thread.join()
+        server.server_close()
+    return received
+
+
+class TestInterruptedRequest:
+    """Ctrl+C or SIGTERM during a response (e.g. its delay) stops the server.
+
+    wsgiref alone answers the interrupted request with a 500 and keeps serving.
+    """
+
+    def test_interrupt_stops_the_server_without_a_response(self):
+        def interrupted_app(environ, start_response):
+            raise KeyboardInterrupt
+
+        assert serve_one_request(interrupted_app, interrupted=True) == ["no response"]
+
+    def test_other_errors_still_get_a_500(self, capsys):
+        def failing_app(environ, start_response):
+            raise ValueError("boom")
+
+        assert serve_one_request(failing_app) == [500]
+
+    def test_normal_request_is_served(self):
+        def ok_app(environ, start_response):
+            start_response("200 OK", [("Content-Type", "application/json")])
+            return [b"{}"]
+
+        assert serve_one_request(ok_app) == [200]
 
 
 class TestClientPortHandler:

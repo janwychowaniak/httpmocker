@@ -12,7 +12,7 @@ A standalone server that serves predefined responses based on request method and
 - **Flexible payloads** - inline JSON objects, or external payload files (JSON objects or arrays)
 - **Configurable delays** - simulate network latency per endpoint
 - **Detailed logging** - verbose console output showing all requests and responses
-- **Graceful shutdown** - handles Ctrl+C cleanly, interrupting any in-flight response delay
+- **Graceful shutdown** - handles Ctrl+C and SIGTERM (`docker stop`) cleanly, interrupting any in-flight response delay
 - **Exact matching** - precise method+path matching for predictable behavior
 
 ## Installation
@@ -258,7 +258,7 @@ Response: 404 (no match for POST /api/nonexistent)
   - `HEAD` requests return same headers as corresponding GET but with no response body
 - **Unmatched requests**: Return HTTP 404 with `{"error": "endpoint not found"}`
 - **Missing payload files**: Application crashes with error description (attention to config correctness forced intentionally)
-- **Delays**: Implemented as interruptible sleep, can be terminated with Ctrl+C
+- **Delays**: Interruptible: Ctrl+C or SIGTERM during a delay stops the server at once, and that request's connection is closed without a response
 
 ### URL Encoding
 

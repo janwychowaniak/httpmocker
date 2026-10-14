@@ -172,7 +172,9 @@ The application follows a clean separation of concerns with four main modules:
    - Argument parsing (`-p/--port`, `-c/--config`, `--validate-config`)
    - Port availability checking
    - Server lifecycle management (startup/shutdown)
-   - Top-level error handling and graceful Ctrl+C and SIGTERM handling
+   - Top-level error handling and graceful Ctrl+C and SIGTERM handling, also in the
+     middle of a request: `ClientPortRequestHandler` runs it through a `ServerHandler`
+     that lets the interrupt through, where plain wsgiref answers 500 and keeps serving
 
 2. **`config_loader.py`** - Configuration management
    - Pydantic models for validation (`Endpoint`, `Config`)
@@ -216,7 +218,8 @@ The application follows a clean separation of concerns with four main modules:
 - **No templating or dynamic routing**: Static configuration for predictable behavior
 - **Fail-fast on errors**: Missing payload files crash the application rather than returning 500s
 - **URL decoding**: Bottle automatically decodes URL-encoded paths (configure paths in decoded form)
-- **Interruptible delays**: Delays can be terminated with Ctrl+C (chunked sleep implementation)
+- **Interruptible delays**: Ctrl+C or SIGTERM during a delay stops the server at once; the
+  interrupted connection is closed without a response (chunked sleep implementation)
 - **JSON support**: Top-level JSON arrays `[]` are supported via `payload_file`; `payload_inline` accepts JSON objects `{}` only
 
 ### Configuration Structure

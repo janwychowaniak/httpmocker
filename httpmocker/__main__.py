@@ -3,10 +3,13 @@ import signal
 import socket
 import sys
 from types import FrameType
-from typing import Any
-from wsgiref.simple_server import WSGIRequestHandler
+from typing import IO, TYPE_CHECKING, Any, cast
+from wsgiref.simple_server import ServerHandler, WSGIRequestHandler, WSGIServer
 
 from bottle import run
+
+if TYPE_CHECKING:
+    from _typeshed.wsgi import WSGIApplication
 
 from .config_loader import load_config
 from .console_formatter import log_server_shutdown, log_server_startup
@@ -78,13 +81,64 @@ def _inject_remote_port(environ: dict[str, Any], client_address: tuple[str, int]
     return environ
 
 
+class _InterruptibleServerHandler(ServerHandler):
+    """A wsgiref handler that lets Ctrl+C and SIGTERM through.
+
+    wsgiref answers any exception from the app, KeyboardInterrupt included,
+    with a 500 and keeps serving. A signal that arrived during a response delay
+    would then send a response the config never defined and leave the server
+    running, so this handler only records the interrupt.
+    """
+
+    interrupted = False
+    request_handler: WSGIRequestHandler  # set by the request handler; not in typeshed
+
+    def handle_error(self) -> None:
+        if isinstance(sys.exc_info()[1], KeyboardInterrupt):
+            self.interrupted = True
+            return
+        super().handle_error()
+
+
 class ClientPortRequestHandler(WSGIRequestHandler):
     """WSGI request handler that adds the client port to the environ.
 
     It also skips reverse-DNS lookups and silences the default request log
     (the app does its own request logging), mirroring Bottle's built-in
-    ``FixedHandler``.
+    ``FixedHandler``, and stops the server when a request is interrupted.
     """
+
+    server: WSGIServer  # typeshed has the BaseServer of any request handler
+
+    def handle(self) -> None:
+        """Handle one request; re-raise an interrupt once wsgiref is done with it.
+
+        This is ``WSGIRequestHandler.handle`` (the same in Python 3.10 to 3.14)
+        with ``_InterruptibleServerHandler`` in place of ``ServerHandler``. The
+        interrupted connection is closed without a response.
+        """
+        self.raw_requestline = self.rfile.readline(65537)
+        if len(self.raw_requestline) > 65536:
+            self.requestline = ""
+            self.request_version = ""
+            self.command = ""
+            self.send_error(414)
+            return
+
+        if not self.parse_request():  # An error code has been sent, just exit
+            return
+
+        handler = _InterruptibleServerHandler(
+            self.rfile,
+            cast("IO[bytes]", self.wfile),
+            self.get_stderr(),
+            self.get_environ(),
+            multithread=False,
+        )
+        handler.request_handler = self  # backpointer for logging
+        handler.run(cast("WSGIApplication", self.server.get_app()))
+        if handler.interrupted:
+            raise KeyboardInterrupt
 
     def get_environ(self) -> dict[str, Any]:
         return _inject_remote_port(super().get_environ(), self.client_address)
