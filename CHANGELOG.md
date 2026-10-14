@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-14
+
 ### Added
 - `payload_inline` accepts a top-level JSON array as well as an object, as
   `payload_file` already did, so a short list no longer needs a file of its own.
