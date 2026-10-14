@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-10-13
+## [0.1.0] - 2026-10-14
+
+`ghcr.io/janwychowaniak/httpmocker@sha256:91b18cf842127676584065401dd03e8ea010341d7d6f035e2a025440e6b64fa7`
+
+Image Id `sha256:1adb1e644982ae216b88e9d48956461acd607880f74b5ec634b77ecb74255516`, after a
+pull and after `docker load` of the release file alike. Python 3.14.8. The digest was read
+from the workflow's push and from a pull of the tag; the image can be pulled without logging
+in. The release workflow ran for the first time with this tag, and every step of both jobs
+passed. (The tagged commit dates this release 2026-10-13, the day it was prepared; it was
+tagged and published on 2026-10-14.)
 
 ### Added
 - PEP 621 packaging via `pyproject.toml` (hatchling build backend), a
