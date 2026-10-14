@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `docker stop` now shuts the server down cleanly, as Ctrl+C does. The image runs
+  the server as PID 1, where a SIGTERM without a handler is ignored, so Docker
+  waited out its 10-second timeout and killed the process (exit code 137); outside
+  a container SIGTERM ended it at once, without the shutdown message. SIGTERM now
+  stops the server with exit code 0, which also covers systemd and Kubernetes.
+
 ## [0.1.0] - 2026-10-14
 
 `ghcr.io/janwychowaniak/httpmocker@sha256:91b18cf842127676584065401dd03e8ea010341d7d6f035e2a025440e6b64fa7`

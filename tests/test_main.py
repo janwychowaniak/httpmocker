@@ -1,11 +1,14 @@
 """Tests for the CLI entry point in __main__.
 
 The blocking server loop is not exercised; these cover argument parsing, port
-availability checking, and the --validate-config path of main().
+availability checking, the --validate-config path of main(), and shutting the
+server down on SIGTERM.
 """
 
 import json
+import signal
 import socket
+import time
 from wsgiref.simple_server import WSGIRequestHandler
 
 import pytest
@@ -109,6 +112,45 @@ class TestMainValidateConfig:
         with pytest.raises(SystemExit) as exc_info:
             main()
         assert exc_info.value.code == 1
+
+
+class TestMainShutdown:
+    """SIGTERM (what `docker stop` sends) shuts the server down like Ctrl+C."""
+
+    @pytest.fixture(autouse=True)
+    def restore_sigterm_handler(self):
+        previous = signal.getsignal(signal.SIGTERM)
+        yield
+        signal.signal(signal.SIGTERM, previous)
+
+    def test_sigterm_shuts_down_cleanly(self, tmp_path, monkeypatch, capsys):
+        config_file = write_config(
+            tmp_path,
+            [
+                {
+                    "method": "GET",
+                    "path": "/a",
+                    "status": 200,
+                    "delay_ms": 0,
+                    "payload_inline": {"ok": True},
+                }
+            ],
+        )
+        monkeypatch.setattr("sys.argv", ["httpmocker", "-p", "0", "-c", str(config_file)])
+
+        def serve_until_signalled(*args, **kwargs):
+            # Stands in for bottle.run blocking in the server loop. Without a
+            # handler SIGTERM would end the test process, so check first.
+            if not callable(signal.getsignal(signal.SIGTERM)):
+                pytest.fail("no SIGTERM handler is installed when the server starts")
+            signal.raise_signal(signal.SIGTERM)
+            time.sleep(5)
+            pytest.fail("SIGTERM did not stop the server")
+
+        monkeypatch.setattr("httpmocker.__main__.run", serve_until_signalled)
+        # Returns normally: a clean shutdown, not an error exit.
+        main()
+        assert "httpmocker shutting down" in capsys.readouterr().out
 
 
 class TestClientPortHandler:

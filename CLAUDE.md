@@ -171,7 +171,7 @@ The application follows a clean separation of concerns with four main modules:
    - Argument parsing (`-p/--port`, `-c/--config`, `--validate-config`)
    - Port availability checking
    - Server lifecycle management (startup/shutdown)
-   - Top-level error handling and graceful Ctrl+C handling
+   - Top-level error handling and graceful Ctrl+C and SIGTERM handling
 
 2. **`config_loader.py`** - Configuration management
    - Pydantic models for validation (`Endpoint`, `Config`)

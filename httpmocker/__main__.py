@@ -1,6 +1,8 @@
 import argparse
+import signal
 import socket
 import sys
+from types import FrameType
 from typing import Any
 from wsgiref.simple_server import WSGIRequestHandler
 
@@ -51,6 +53,16 @@ def check_port_available(port: int) -> None:
     except OSError:
         print(f"Error: Port {port} already in use")
         sys.exit(1)
+
+
+def _shutdown_on_sigterm(signum: int, frame: FrameType | None) -> None:
+    """Turn SIGTERM into the same clean shutdown as Ctrl+C.
+
+    ``docker stop``, systemd and Kubernetes stop a process with SIGTERM. In a
+    container the server runs as PID 1, where a signal without a handler is
+    ignored, so Docker would wait out its timeout and kill the process.
+    """
+    raise KeyboardInterrupt
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -111,6 +123,9 @@ def main() -> None:
 
         # Log startup information
         log_server_startup(args.port, args.config, len(config.endpoints))
+
+        # Stop on SIGTERM exactly as on Ctrl+C
+        signal.signal(signal.SIGTERM, _shutdown_on_sigterm)
 
         # Start the HTTP server
         try:
