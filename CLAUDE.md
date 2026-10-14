@@ -187,7 +187,8 @@ The application follows a clean separation of concerns with four main modules:
      status codes 100-599, non-negative delays
    - Each endpoint requires exactly one of `payload_inline` or `payload_file`
    - Validates at startup that payload files exist and hold valid JSON, reporting every
-     problem at once
+     problem with them at once; this runs only after the models validate, so a config
+     with both kinds of errors shows the payload file problems on the next run
    - All errors result in `SystemExit(1)` with an error message (pydantic's own report for
      model validation errors)
 

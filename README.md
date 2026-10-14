@@ -136,7 +136,8 @@ Use _either_ `payload_inline` for short responses written into the config _or_ `
 
 A config needs at least one endpoint, and each endpoint exactly one of `payload_inline`
 and `payload_file`. Every payload file must exist and hold valid JSON (UTF-8). Otherwise
-the server refuses to start and says why, listing every problem. Other fields, such as
+the server refuses to start and says why: first every error in the endpoints' fields,
+then, once those pass, every problem with the payload files. Other fields, such as
 `headers`, are ignored (see [Limitations](#limitations)).
 
 `payload_file` paths are resolved relative to the directory the server is started from,
