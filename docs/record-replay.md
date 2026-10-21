@@ -1,8 +1,8 @@
 # Record, replay and the journal
 
-**Status:** design of httpmocker 0.3.0, being built. This document is the contract of the feature. The
-README's "Record and replay" section is derived from it; where the two differ, this document wins. It is
-kept in sync as the build settles details.
+**Status:** shipped in httpmocker 0.3.0. This document is the contract of the feature. The README's
+"Record and replay" section is derived from it; where the two differ, this document wins. A change to
+the feature updates this document in the same commit.
 
 ## 1. Purpose and scope
 

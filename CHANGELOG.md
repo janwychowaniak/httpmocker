@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-21
+
 Record and replay, for APIs that keep state. A config answers every request the same way,
 while a real API answers the second identical `PUT` with a conflict. httpmocker can now
 record a conversation with the real API and replay it, error bodies included. The contract
