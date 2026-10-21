@@ -1,9 +1,10 @@
 """Tests for the CLI entry point in __main__.
 
-The blocking server loop is not exercised; these cover argument parsing, port
-availability checking, the --validate-config path of main(), shutting the
-server down on SIGTERM, and the request handler serving single requests,
-interrupted or not.
+The blocking server loop is not exercised; these cover argument parsing (the
+three run modes and the record options), port availability checking, the
+--validate-config path of main(), shutting the server down on SIGTERM, and the
+request handler serving single requests, interrupted or not, with the request
+target and headers as received.
 """
 
 import http.client
@@ -13,15 +14,21 @@ import socket
 import sys
 import threading
 import time
+from email.message import Message
 from wsgiref.simple_server import WSGIRequestHandler, make_server
 
 import pytest
 
 from httpmocker.__main__ import (
+    DEFAULT_UPSTREAM_TIMEOUT,
+    RAW_HEADERS_KEY,
+    RAW_TARGET_KEY,
     ClientPortRequestHandler,
+    _inject_raw_request,
     _inject_remote_port,
     check_port_available,
     main,
+    normalize_target_url,
     parse_arguments,
 )
 
@@ -268,3 +275,306 @@ class TestClientPortHandler:
         handler = object.__new__(ClientPortRequestHandler)
         handler.log_request(200, 123)
         assert capsys.readouterr().out == ""
+
+
+def parse(monkeypatch, *argv):
+    """Parse ``httpmocker -p 8080 <argv>``."""
+    monkeypatch.setattr("sys.argv", ["httpmocker", "-p", "8080", *argv])
+    return parse_arguments()
+
+
+def assert_usage_error(monkeypatch, capsys, *argv, message):
+    """Parsing ``argv`` exits with argparse's usage status and names the problem."""
+    with pytest.raises(SystemExit) as exc_info:
+        parse(monkeypatch, *argv)
+    assert exc_info.value.code == 2
+    assert message in capsys.readouterr().err
+
+
+RECORD = ("--record", "https://api.example.test", "--cassette", "c.json")
+
+
+class TestParseModes:
+    """Exactly one of -c, --record and --replay; the record options only with --record."""
+
+    def test_replay_mode(self, monkeypatch):
+        args = parse(monkeypatch, "--replay", "c.json")
+        assert args.replay == "c.json"
+        assert args.config is None
+        assert args.record is None
+
+    def test_replay_with_validate_config(self, monkeypatch):
+        args = parse(monkeypatch, "--replay", "c.json", "--validate-config")
+        assert args.validate_config is True
+
+    def test_record_mode_defaults(self, monkeypatch):
+        args = parse(monkeypatch, *RECORD)
+        assert args.record == "https://api.example.test"
+        assert args.cassette == "c.json"
+        assert args.upstream_timeout == DEFAULT_UPSTREAM_TIMEOUT
+        assert args.ignore_query_param == []
+        assert args.ignore_json_path == []
+        assert args.match_header == []
+        assert args.redact_header == []
+        assert args.redact_query_param == []
+
+    def test_record_options_are_collected_and_normalized(self, monkeypatch):
+        args = parse(
+            monkeypatch,
+            "--record",
+            "http://localhost:9000/v1/",
+            "--cassette",
+            "c.json",
+            "--upstream-timeout",
+            "2.5",
+            "--ignore-query-param",
+            "ts",
+            "--ignore-query-param",
+            "nonce",
+            "--ignore-json-path",
+            "/request_id",
+            "--match-header",
+            "User-Agent",
+            "--redact-header",
+            "X-Api-Key",
+            "--redact-query-param",
+            "api_key",
+        )
+        assert args.record == "http://localhost:9000/v1"
+        assert args.upstream_timeout == 2.5
+        assert args.ignore_query_param == ["ts", "nonce"]
+        assert args.ignore_json_path == ["/request_id"]
+        assert args.match_header == ["user-agent"]
+        assert args.redact_header == ["x-api-key"]
+        assert args.redact_query_param == ["api_key"]
+
+    def test_modes_are_mutually_exclusive(self, monkeypatch, capsys):
+        assert_usage_error(
+            monkeypatch, capsys, "-c", "c.json", "--replay", "r.json", message="not allowed with"
+        )
+
+    def test_record_requires_cassette(self, monkeypatch, capsys):
+        assert_usage_error(
+            monkeypatch,
+            capsys,
+            "--record",
+            "https://api.example.test",
+            message="--record requires --cassette",
+        )
+
+    def test_validate_config_does_not_apply_to_record(self, monkeypatch, capsys):
+        assert_usage_error(
+            monkeypatch, capsys, *RECORD, "--validate-config", message="--validate-config"
+        )
+
+    @pytest.mark.parametrize("mode", [("-c", "c.json"), ("--replay", "r.json")])
+    @pytest.mark.parametrize(
+        "option",
+        [
+            ("--cassette", "x.json"),
+            ("--upstream-timeout", "5"),
+            ("--ignore-query-param", "ts"),
+            ("--ignore-json-path", "/id"),
+            ("--match-header", "user-agent"),
+            ("--redact-header", "x-api-key"),
+            ("--redact-query-param", "api_key"),
+        ],
+    )
+    def test_record_options_outside_record_are_refused(self, monkeypatch, capsys, mode, option):
+        assert_usage_error(
+            monkeypatch, capsys, *mode, *option, message=f"{option[0]}: only valid with --record"
+        )
+
+
+class TestRecordOptionChecks:
+    @pytest.mark.parametrize("value", ["0", "-1", "nan", "inf"])
+    def test_upstream_timeout_must_be_positive_and_finite(self, monkeypatch, capsys, value):
+        assert_usage_error(
+            monkeypatch,
+            capsys,
+            *RECORD,
+            "--upstream-timeout",
+            value,
+            message="--upstream-timeout must be a positive number",
+        )
+
+    @pytest.mark.parametrize("pointer", ["", "request_id", "/a~2b"])
+    def test_ignore_json_path_must_be_a_json_pointer(self, monkeypatch, capsys, pointer):
+        assert_usage_error(
+            monkeypatch, capsys, *RECORD, "--ignore-json-path", pointer, message="JSON Pointer"
+        )
+
+    @pytest.mark.parametrize(
+        "header", ["Authorization", "proxy-authorization", "cookie", "Set-Cookie"]
+    )
+    def test_default_redacted_header_cannot_be_matched(self, monkeypatch, capsys, header):
+        assert_usage_error(
+            monkeypatch,
+            capsys,
+            *RECORD,
+            "--match-header",
+            header,
+            message="a redacted header cannot take part in matching",
+        )
+
+    def test_header_redacted_by_flag_cannot_be_matched(self, monkeypatch, capsys):
+        assert_usage_error(
+            monkeypatch,
+            capsys,
+            *RECORD,
+            "--redact-header",
+            "X-Api-Key",
+            "--match-header",
+            "x-api-key",
+            message="--match-header x-api-key: a redacted header",
+        )
+
+    @pytest.mark.parametrize("header", ["Host", "content-length", "Transfer-Encoding"])
+    def test_transport_header_cannot_be_matched(self, monkeypatch, capsys, header):
+        assert_usage_error(
+            monkeypatch,
+            capsys,
+            *RECORD,
+            "--match-header",
+            header,
+            message="a transport header cannot take part in matching",
+        )
+
+    def test_invalid_target_is_a_usage_error(self, monkeypatch, capsys):
+        assert_usage_error(
+            monkeypatch,
+            capsys,
+            "--record",
+            "ftp://api.example.test",
+            "--cassette",
+            "c.json",
+            message="http:// or https://",
+        )
+
+
+class TestNormalizeTargetUrl:
+    @pytest.mark.parametrize(
+        ("url", "expected"),
+        [
+            ("https://api.example.test", "https://api.example.test"),
+            ("http://localhost:8080/", "http://localhost:8080"),
+            ("https://api.example.test/v1/prefix/", "https://api.example.test/v1/prefix"),
+            ("http://[::1]:9000", "http://[::1]:9000"),
+            ("HTTPS://api.example.test", "HTTPS://api.example.test"),
+        ],
+    )
+    def test_accepted_targets(self, url, expected):
+        assert normalize_target_url(url) == expected
+
+    @pytest.mark.parametrize(
+        ("url", "message"),
+        [
+            ("ftp://api.example.test", "http:// or https://"),
+            ("api.example.test:8080", "http:// or https://"),
+            ("http://", "no host"),
+            ("http://api.example.test:99999", "invalid port"),
+            ("http://api.example.test:http", "invalid port"),
+            ("http://api.example.test/?q=1", "query or a fragment"),
+            ("http://api.example.test/?", "query or a fragment"),
+            ("http://api.example.test/#top", "query or a fragment"),
+        ],
+    )
+    def test_refused_targets(self, url, message):
+        with pytest.raises(ValueError, match=message):
+            normalize_target_url(url)
+
+    @pytest.mark.parametrize(
+        "url", ["https://user:s3cret@api.example.test", "https://user@api.example.test"]
+    )
+    def test_user_info_is_refused_without_echoing_it(self, url):
+        with pytest.raises(ValueError, match="user info") as exc_info:
+            normalize_target_url(url)
+        assert "s3cret" not in str(exc_info.value)
+        assert "user@" not in str(exc_info.value)
+
+
+class TestMainModesInProgress:
+    """Record and replay are parsed, but not served until they are built."""
+
+    @pytest.mark.parametrize(
+        ("argv", "mode"), [(RECORD, "record"), (("--replay", "c.json"), "replay")]
+    )
+    def test_mode_reports_it_is_not_available(self, monkeypatch, capsys, argv, mode):
+        monkeypatch.setattr("sys.argv", ["httpmocker", "-p", "8080", *argv])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 1
+        assert f"{mode} mode is not available yet" in capsys.readouterr().out
+
+
+def capture_environ(send):
+    """Serve one request, written by ``send(conn)``, with ClientPortRequestHandler.
+
+    Returns the environ the WSGI app received.
+    """
+    captured = {}
+
+    def app(environ, start_response):
+        captured.update(environ)
+        start_response("204 No Content", [])
+        return []
+
+    server = make_server("127.0.0.1", 0, app, handler_class=ClientPortRequestHandler)
+
+    def client():
+        conn = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+        try:
+            send(conn)
+            conn.getresponse().read()
+        finally:
+            conn.close()
+
+    thread = threading.Thread(target=client)
+    thread.start()
+    try:
+        server.handle_request()
+    finally:
+        thread.join()
+        server.server_close()
+    return captured
+
+
+class TestRawRequest:
+    """The handler keeps the request target and headers as the client sent them."""
+
+    def test_inject_raw_request_keeps_order_and_repeats(self):
+        headers = Message()
+        headers["X-Rep"] = "1"
+        headers["Accept"] = "application/json"
+        headers["X-Rep"] = " 2 "
+        environ = _inject_raw_request({}, "/a%2Fb?x=1", headers)
+        assert environ[RAW_TARGET_KEY] == "/a%2Fb?x=1"
+        assert environ[RAW_HEADERS_KEY] == [
+            ("X-Rep", "1"),
+            ("Accept", "application/json"),
+            ("X-Rep", "2"),
+        ]
+
+    def test_served_request_carries_target_and_headers_as_received(self):
+        def send(conn):
+            conn.putrequest("GET", "/v1/a%2Fb?x=1&x=2", skip_host=True, skip_accept_encoding=True)
+            conn.putheader("Host", "mock.test")
+            conn.putheader("X-Rep", "1")
+            conn.putheader("X-Rep", "2")
+            conn.putheader("X-Api-Key", "dash")
+            conn.putheader("X_Api_Key", "underscore")
+            conn.endheaders()
+
+        environ = capture_environ(send)
+        assert environ[RAW_TARGET_KEY] == "/v1/a%2Fb?x=1&x=2"
+        assert environ[RAW_HEADERS_KEY] == [
+            ("Host", "mock.test"),
+            ("X-Rep", "1"),
+            ("X-Rep", "2"),
+            ("X-Api-Key", "dash"),
+            ("X_Api_Key", "underscore"),
+        ]
+        # What wsgiref alone makes of the same request
+        assert environ["PATH_INFO"] == "/v1/a/b"
+        assert environ["HTTP_X_REP"] == "1,2"
+        assert environ["HTTP_X_API_KEY"] == "dash,underscore"

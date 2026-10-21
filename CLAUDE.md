@@ -195,7 +195,12 @@ next release.
 The application follows a clean separation of concerns with four main modules:
 
 1. **`__main__.py`** - CLI entry point
-   - Argument parsing (`-p/--port`, `-c/--config`, `--validate-config`)
+   - Argument parsing (`-p/--port`, one mode of `-c/--config`, `--record`, `--replay`,
+     `--validate-config`); the record options are checked and normalized here. Record and
+     replay are parsed but not served yet: 0.3.0 is building them step by step
+   - `ClientPortRequestHandler` adds the request target and headers as received to the
+     environ (`httpmocker.raw_target`, `httpmocker.raw_headers`), since wsgiref
+     percent-decodes `PATH_INFO` and folds repeated headers
    - Port availability checking
    - Server lifecycle management (startup/shutdown)
    - Top-level error handling and graceful Ctrl+C and SIGTERM handling, also in the
@@ -274,7 +279,8 @@ The codebase includes comprehensive unit tests organized by module:
 - `tests/test_config_loader.py` - Pydantic validation (including supported methods and the path rules), config loading (valid/invalid JSON), payload file validation (missing, unreadable, invalid JSON), and edge cases (zero delays, complex paths, multiple endpoints)
 - `tests/test_request_handler.py` - the WSGI app: endpoint matching, method/status handling, HTTP semantics (204, HEAD), payload files (object/array), and delays
 - `tests/test_console_formatter.py` - payload-source formatting, request/response logging, and lifecycle banners
-- `tests/test_main.py` - CLI argument parsing, port-availability checks (including a port left in TIME_WAIT), the `--validate-config` path, shutdown on SIGTERM, and the request handler (client port, interrupted requests)
+- `tests/test_main.py` - CLI argument parsing (run modes, record options, target URL checks), port-availability checks (including a port left in TIME_WAIT), the `--validate-config` path, shutdown on SIGTERM, and the request handler (client port, interrupted requests, raw target and headers)
+- `tests/test_identity.py` - request identity helpers (JSON Pointer parsing so far)
 
 When adding features, follow the existing test structure with descriptive docstrings and organized test classes.
 
@@ -329,11 +335,14 @@ httpmocker/
 │   ├── config_loader.py        # Configuration & validation
 │   ├── request_handler.py      # HTTP handling & routing
 │   ├── console_formatter.py    # Logging & output
+│   ├── headers.py              # Transport and default redacted header sets (0.3.0)
+│   ├── identity.py             # Request identity for replay (0.3.0, in progress)
 │   └── py.typed                # PEP 561 typing marker
 ├── tests/                      # Unit tests
 │   ├── test_config_loader.py
 │   ├── test_request_handler.py
 │   ├── test_console_formatter.py
+│   ├── test_identity.py
 │   └── test_main.py
 ├── configs/                    # API configuration files
 │   └── example.json            # Example config (copy to your own)

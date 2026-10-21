@@ -1,9 +1,12 @@
 import argparse
+import math
 import signal
 import socket
 import sys
+from email.message import Message
 from types import FrameType
 from typing import IO, TYPE_CHECKING, Any, cast
+from urllib.parse import urlsplit
 from wsgiref.simple_server import ServerHandler, WSGIRequestHandler, WSGIServer
 
 from bottle import run
@@ -13,9 +16,24 @@ if TYPE_CHECKING:
 
 from .config_loader import load_config
 from .console_formatter import log_server_shutdown, log_server_startup
+from .headers import DEFAULT_REDACTED_HEADERS, TRANSPORT_HEADERS
+from .identity import parse_json_pointer
 from .request_handler import create_app
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+DEFAULT_UPSTREAM_TIMEOUT = 30.0
+
+# Options that only apply to --record: (attribute, option name)
+_RECORD_OPTIONS = (
+    ("cassette", "--cassette"),
+    ("upstream_timeout", "--upstream-timeout"),
+    ("ignore_query_param", "--ignore-query-param"),
+    ("ignore_json_path", "--ignore-json-path"),
+    ("match_header", "--match-header"),
+    ("redact_header", "--redact-header"),
+    ("redact_query_param", "--redact-query-param"),
+)
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -27,17 +45,164 @@ def parse_arguments() -> argparse.Namespace:
 
     parser.add_argument("-p", "--port", type=int, required=True, help="HTTP server port")
 
-    parser.add_argument(
-        "-c", "--config", type=str, required=True, help="Path to JSON configuration file"
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("-c", "--config", type=str, help="Path to JSON configuration file")
+    mode.add_argument(
+        "--record",
+        metavar="TARGET_BASE_URL",
+        help="Forward every request to this base URL and record the exchanges into --cassette",
+    )
+    mode.add_argument(
+        "--replay", metavar="CASSETTE", help="Serve the interactions recorded in this cassette"
     )
 
     parser.add_argument(
         "--validate-config",
         action="store_true",
-        help="Validate configuration file and exit (don't start server). Example: httpmocker -p 8080 -c config.json --validate-config",
+        help="Validate the configuration file (-c) or the cassette (--replay) and exit (don't start server). Example: httpmocker -p 8080 -c config.json --validate-config",
     )
 
-    return parser.parse_args()
+    record = parser.add_argument_group("record mode options")
+    record.add_argument(
+        "--cassette", metavar="FILE", help="Cassette to record into; must be absent or empty"
+    )
+    record.add_argument(
+        "--upstream-timeout",
+        type=float,
+        metavar="SECONDS",
+        help=f"Deadline for each whole exchange with the target (default: {DEFAULT_UPSTREAM_TIMEOUT:g})",
+    )
+    record.add_argument(
+        "--ignore-query-param",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Leave this query parameter out of request matching (repeatable)",
+    )
+    record.add_argument(
+        "--ignore-json-path",
+        action="append",
+        default=[],
+        metavar="POINTER",
+        help="Delete this JSON Pointer from JSON request bodies before matching (repeatable)",
+    )
+    record.add_argument(
+        "--match-header",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Make this request header part of request matching (repeatable)",
+    )
+    record.add_argument(
+        "--redact-header",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Hide this header's value in the cassette, console and journal; Authorization, Proxy-Authorization, Cookie and Set-Cookie always are (repeatable)",
+    )
+    record.add_argument(
+        "--redact-query-param",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Hide this query parameter's value in the cassette, console and journal (repeatable)",
+    )
+
+    args = parser.parse_args()
+    _check_mode_options(parser, args)
+    return args
+
+
+def _check_mode_options(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    """
+    Check the options that depend on the run mode and normalize those of --record.
+
+    Exits through ``parser.error`` (status 2) on a usage error.
+    """
+    if args.record is None:
+        given = [
+            option
+            for attribute, option in _RECORD_OPTIONS
+            if getattr(args, attribute) not in (None, [])
+        ]
+        if given:
+            parser.error(f"{', '.join(given)}: only valid with --record")
+        return
+
+    if args.cassette is None:
+        parser.error("--record requires --cassette")
+    if args.validate_config:
+        parser.error("--validate-config: only valid with -c or --replay")
+
+    try:
+        args.record = normalize_target_url(args.record)
+    except ValueError as e:
+        parser.error(str(e))
+
+    if args.upstream_timeout is None:
+        args.upstream_timeout = DEFAULT_UPSTREAM_TIMEOUT
+    elif not (math.isfinite(args.upstream_timeout) and args.upstream_timeout > 0):
+        parser.error(f"--upstream-timeout must be a positive number, got: {args.upstream_timeout}")
+
+    for pointer in args.ignore_json_path:
+        try:
+            parse_json_pointer(pointer)
+        except ValueError as e:
+            parser.error(f"--ignore-json-path: {e}")
+
+    # Header names are case-insensitive; keep them lower-cased from here on
+    args.match_header = [name.lower() for name in args.match_header]
+    args.redact_header = [name.lower() for name in args.redact_header]
+
+    redacted = set(DEFAULT_REDACTED_HEADERS) | set(args.redact_header)
+    for name in args.match_header:
+        if name in redacted:
+            parser.error(
+                f"--match-header {name}: a redacted header cannot take part in matching,"
+                " since its value is not kept"
+            )
+        if name in TRANSPORT_HEADERS:
+            parser.error(
+                f"--match-header {name}: a transport header cannot take part in matching,"
+                " since it is not recorded"
+            )
+
+
+def normalize_target_url(url: str) -> str:
+    """
+    Check the --record target and strip a trailing slash.
+
+    Args:
+        url: Target base URL, ``http(s)://host[:port][/prefix]``
+
+    Returns:
+        The URL without a trailing slash
+
+    Raises:
+        ValueError: If the URL is not a plain http(s) base URL. The message does
+            not repeat a URL that holds user info, so a password stays off the
+            console.
+    """
+    parts = urlsplit(url)
+    if parts.username is not None or parts.password is not None:
+        raise ValueError(
+            "--record target must not contain user info (user:password@): it would be"
+            " written to the cassette in clear"
+        )
+    if parts.scheme not in ("http", "https"):
+        raise ValueError(f"--record target must be an http:// or https:// URL, got: {url!r}")
+    if not parts.hostname:
+        raise ValueError(f"--record target has no host, got: {url!r}")
+    try:
+        parts.port  # noqa: B018 - raises ValueError for a port out of range
+    except ValueError:
+        raise ValueError(f"--record target has an invalid port, got: {url!r}") from None
+    if "?" in url or "#" in url:
+        raise ValueError(
+            f"--record target must not contain a query or a fragment, got: {url!r}; the"
+            " request's own query is appended to it"
+        )
+    return url.rstrip("/")
 
 
 def check_port_available(port: int) -> None:
@@ -87,6 +252,27 @@ def _inject_remote_port(environ: dict[str, Any], client_address: tuple[str, int]
     return environ
 
 
+# Server-specific environ keys (PEP 3333) holding the request as received
+RAW_TARGET_KEY = "httpmocker.raw_target"
+RAW_HEADERS_KEY = "httpmocker.raw_headers"
+
+
+def _inject_raw_request(environ: dict[str, Any], target: str, headers: Message) -> dict[str, Any]:
+    """Expose the request target and headers as the client sent them.
+
+    wsgiref percent-decodes ``PATH_INFO`` (``/a%2Fb`` arrives as ``/a/b``) and
+    folds the headers into ``HTTP_*`` keys: it comma-joins repeats and turns
+    ``-`` into ``_``, so ``X-Api-Key`` and ``X_Api_Key`` collide. Record mode
+    forwards the request target and headers unaltered, and request matching
+    needs a repeated header's values one by one, so both are kept as received:
+    the target with its query, and the headers as ``(name, value)`` pairs in
+    order, repeats included.
+    """
+    environ[RAW_TARGET_KEY] = target
+    environ[RAW_HEADERS_KEY] = [(name, str(value).strip()) for name, value in headers.items()]
+    return environ
+
+
 class _InterruptibleServerHandler(ServerHandler):
     """A wsgiref handler that lets Ctrl+C and SIGTERM through.
 
@@ -109,9 +295,10 @@ class _InterruptibleServerHandler(ServerHandler):
 class ClientPortRequestHandler(WSGIRequestHandler):
     """WSGI request handler that adds the client port to the environ.
 
-    It also skips reverse-DNS lookups and silences the default request log
-    (the app does its own request logging), mirroring Bottle's built-in
-    ``FixedHandler``, and stops the server when a request is interrupted.
+    It also adds the request target and headers as received, skips reverse-DNS
+    lookups and silences the default request log (the app does its own request
+    logging), mirroring Bottle's built-in ``FixedHandler``, and stops the server
+    when a request is interrupted.
     """
 
     server: WSGIServer  # typeshed has the BaseServer of any request handler
@@ -138,7 +325,7 @@ class ClientPortRequestHandler(WSGIRequestHandler):
             self.rfile,
             cast("IO[bytes]", self.wfile),
             self.get_stderr(),
-            self.get_environ(),
+            _inject_raw_request(self.get_environ(), self.path, self.headers),
             multithread=False,
         )
         handler.request_handler = self  # backpointer for logging
@@ -164,6 +351,12 @@ def main() -> None:
     try:
         # Parse command line arguments
         args = parse_arguments()
+
+        # Record and replay are being built (docs/record-replay.md)
+        if args.config is None:
+            mode = "record" if args.record is not None else "replay"
+            print(f"Error: {mode} mode is not available yet")
+            sys.exit(1)
 
         # Load and validate configuration
         config = load_config(args.config)
