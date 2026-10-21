@@ -106,6 +106,10 @@ jobs:
           curl -fsS http://127.0.0.1:8080/api/some-urls
           test "$(docker run --rm "$IMAGE:$VERSION" python -c 'import httpmocker; print(httpmocker.__version__)')" = "$VERSION"
 
+      # CI runs the same script on every push, on the image it scans.
+      - name: The image replays the example cassette before it is pushed
+        run: scripts/smoke/replay-example.sh "$IMAGE:$VERSION"
+
       - name: Log in to GHCR
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}

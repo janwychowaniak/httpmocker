@@ -137,7 +137,8 @@ a new rule's `keywords` can suppress built-in detections.
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and on
 pull requests: a lint/format/types job (`ruff check` + `ruff format --check` +
-`mypy`), a dependency-audit job (`pip-audit`), a Docker image scan (Trivy), and a
+`mypy`), a dependency-audit job (`pip-audit`), a Docker image job (Trivy scan, then
+`scripts/smoke/replay-example.sh` replays `cassettes/example.json` in the image), and a
 test job across Python 3.10–3.14. Its `concurrency` cancels a run in progress when
 a newer push reaches the same branch, on `main` too, by choice: after several quick
 pushes the earlier runs show as cancelled, and the run of the last pushed commit is
@@ -152,7 +153,8 @@ all commit messages for secrets on every push, pull request and weekly.
 published, the `publish` job checks that the tag is annotated and equals
 `v` + `httpmocker.__version__`, runs the suite, builds the wheel and sdist (installing
 the wheel into a clean venv), builds the image, scans it with Trivy (the CI gate) and
-smoke-tests it against `configs/example.json`. It then pushes
+smoke-tests it against `configs/example.json` and, with the script CI runs,
+`cassettes/example.json`. It then pushes
 `ghcr.io/janwychowaniak/httpmocker:<version>` and `latest` (amd64; `latest` is not a
 contract). The `release` job pulls that image by digest, saves it as
 `httpmocker-<version>-image-amd64.tar.gz`, proves the archive loads back as the same image
@@ -357,7 +359,11 @@ When adding features, follow the existing test structure with descriptive docstr
 curl -X GET http://localhost:8080/api/users
 curl -X POST http://localhost:8080/api/login -d '{"username":"test"}'
 curl -I http://localhost:8080/api/users  # HEAD: configs/example.json has a HEAD endpoint for it
+curl http://localhost:8080/_httpmocker/journal  # what the server received, in every mode
 ```
+
+`smoke-tests.md` has the curl calls for both examples, including the whole replay
+scenario of `cassettes/example.json`.
 
 ## Dependencies
 
@@ -423,8 +429,10 @@ httpmocker/
 │   └── record-replay.md        # Contract of record, replay and the journal (0.3.0)
 ├── scripts/
 │   ├── gitleaks/               # Secret-scan hook scripts (wired via pre-commit)
-│   └── release/
-│       └── archive-image.sh    # Save the published image and prove it loads back
+│   ├── release/
+│   │   └── archive-image.sh    # Save the published image and prove it loads back
+│   └── smoke/
+│       └── replay-example.sh   # Replay the example cassette in an image (CI and release)
 ├── .github/                    # CI & automation
 │   ├── workflows/
 │   │   ├── ci.yml              # Lint/format/types, audit, Docker scan, tests
@@ -438,7 +446,7 @@ httpmocker/
 ├── .gitleaks.toml              # gitleaks rules (defaults + add-on provider rules)
 ├── pyproject.toml              # Packaging, dependencies & tooling config
 ├── uv.lock                     # Fully-pinned dependency lockfile
-├── smoke-tests.md              # curl calls for every endpoint of configs/example.json
+├── smoke-tests.md              # curl calls for configs/example.json and cassettes/example.json
 ├── .gitignore
 ├── CHANGELOG.md                # Notable changes
 ├── README.md                   # User-facing documentation

@@ -3,7 +3,8 @@
 [![CI](https://github.com/janwychowaniak/httpmocker/actions/workflows/ci.yml/badge.svg)](https://github.com/janwychowaniak/httpmocker/actions/workflows/ci.yml)
 
 Simple HTTP REST API mocker for integration and end-to-end testing.
-A standalone server that serves predefined responses based on request method and path configuration.
+A standalone server that serves predefined responses based on request method and path
+configuration, or records a conversation with a real API and replays it.
 
 ## Features
 
@@ -14,6 +15,11 @@ A standalone server that serves predefined responses based on request method and
 - **Detailed logging** - verbose console output showing all requests and responses
 - **Graceful shutdown** - handles Ctrl+C and SIGTERM (`docker stop`) cleanly, interrupting any in-flight response delay
 - **Exact matching** - precise method+path matching for predictable behavior
+- **Record and replay** - record a real API into a cassette, then serve the recording:
+  repeated identical requests get the recorded responses in recorded order
+- **Request journal** - `GET /_httpmocker/journal` shows what the server received, for
+  test assertions; `DELETE` resets it between scenarios
+- **Redaction** - credentials never reach the console, the journal or a cassette in clear
 
 ## Installation
 
@@ -58,13 +64,19 @@ Only have the Docker image? See [Quick start with the published image](#quick-st
 ## Usage
 
 ```bash
-python -m httpmocker -p <port> -c <config_file>
+python -m httpmocker -p <port> -c <config_file>                              # serve a config
+python -m httpmocker -p <port> --record <target_base_url> --cassette <file>  # record a real API
+python -m httpmocker -p <port> --replay <cassette_file>                      # replay a recording
 ```
 
 **Options:**
 - `-p, --port`: HTTP server port (required)
-- `-c, --config`: Path to JSON configuration file (required)
-- `--validate-config`: Validate configuration file and exit (don't start server)
+- `-c, --config`: Path to JSON configuration file
+- `--record`, `--cassette`: Record a target into a cassette; see [Record and replay](#record-and-replay)
+- `--replay`: Serve a recorded cassette; see [Record and replay](#record-and-replay)
+- `--validate-config`: Validate the configuration file (`-c`) or the cassette (`--replay`) and exit (don't start server)
+
+Exactly one of `-c`, `--record` and `--replay` is required.
 
 ### Configuration Validation
 
@@ -241,6 +253,13 @@ Response: 404 (no match for POST /api/nonexistent)
 ...sent
 ```
 
+The values of `Authorization`, `Proxy-Authorization`, `Cookie` and `Set-Cookie` print as
+`<redacted>`. In record and replay the response line reads
+`PUT /api/items/sample → 201 (84 ms) recorded #0` or
+`PUT /api/items/sample → 409 served #1 (2/2)` (interaction 1 of the cassette, the second of
+two recorded for this request). A miss, an exhausted sequence or a failed exchange with
+the target prints a line in white on red.
+
 ## Behavior Details
 
 ### Request Matching
@@ -251,6 +270,9 @@ Response: 404 (no match for POST /api/nonexistent)
   answers `/api/users?filter=active`. A config path therefore cannot contain `?`, nor `#`,
   since clients do not send the fragment.
 - **Headers**: Logged but not used for matching
+- **Reserved paths**: `/_httpmocker` and everything under `/_httpmocker/` belong to the
+  server itself (the [journal](#the-journal)). A config endpoint there is refused, and a
+  request there other than the journal gets `404` with `X-Httpmocker: reserved`.
 
 ### Response Behavior
 
@@ -284,15 +306,252 @@ httpmocker serves static JSON responses and nothing else, by design:
   server itself and are not JSON: a `405` HTML page for a request with any other method,
   and a `500` plain-text page for a payload file that breaks while the server runs.
 - **Static responses**: no templating, no responses that depend on the request, and no
-  state (such as a different response to the second call).
+  state (such as a different response to the second call) in config mode. For responses
+  that change from call to call, [record and replay](#record-and-replay) the real API.
 - **Exact matching only**: no wildcards, path parameters or regular expressions.
+- **Seven methods**: GET, POST, PUT, DELETE, PATCH, HEAD and OPTIONS. Any other method
+  gets `405` and is not journaled, in every mode.
 - **One request at a time**: the server is single-threaded, so while one response waits
-  out its `delay_ms`, every other request waits as well, whatever its endpoint.
-- **Plain HTTP**: no TLS and no authentication. The server listens on all interfaces
-  (`0.0.0.0`), so when started from the CLI it is reachable from your network, not only
-  from localhost.
+  out its `delay_ms`, every other request waits as well, whatever its endpoint. In record
+  mode they also wait for the target.
+- **Plain HTTP**: the server itself speaks no TLS and asks for no authentication (record
+  mode can reach an HTTPS target). It listens on all interfaces (`0.0.0.0`), so when
+  started from the CLI it is reachable from your network, not only from localhost, and so
+  is its journal.
 - **Console logging only**: requests and responses are logged to standard output, not
-  to a file.
+  to a file; the journal keeps the last 10 000 exchanges in memory.
+
+## Record and replay
+
+A config answers every request the same way. An API that keeps state does not: a `PUT`
+that creates a resource answers `201` the first time and `409` the second. Record mode
+captures such a conversation with the real API in a **cassette** file. Replay mode serves
+the cassette: repeated identical requests get the recorded responses in recorded order,
+error bodies included, verbatim. The recording is the mock.
+
+The full contract, with every rule and the reasons for it, is
+[`docs/record-replay.md`](docs/record-replay.md); this section is the user's guide.
+
+### Recording
+
+Point your client at httpmocker instead of the real API:
+
+```bash
+httpmocker -p 8080 --record https://api.example.test --cassette cassettes/items.json \
+  --ignore-query-param ts --ignore-json-path /request_id --redact-header X-Api-Key
+```
+
+- **Forwarding.** Every request goes to the target base URL as received: the raw path and
+  query appended to the base (which may have a path prefix), the headers in order, and the
+  body.
+  - `Host` is set to the target's.
+  - `Accept-Encoding: identity` is sent, so bodies arrive readable.
+  - Redirects are returned to the client, not followed.
+
+  The target's status, headers and body go back to the client unchanged.
+- **Recording.** Each exchange is appended to the cassette, and the file is complete on disk
+  before the client gets its response. The cassette is rewritten atomically after every
+  interaction, so stopping httpmocker (Ctrl+C, `docker stop`) never leaves a broken file.
+- **A cassette is never overwritten.** `--record` refuses to start on a file that already
+  holds interactions. A missing or empty file, or a cassette left without interactions,
+  is fine.
+- **Methods.** Only GET, POST, PUT, DELETE, PATCH, HEAD and OPTIONS are forwarded.
+
+**Options** (record mode only; each flag can be repeated):
+
+| Option | Effect |
+|---|---|
+| `--ignore-query-param NAME` | the parameter does not take part in matching on replay (timestamps, nonces); its value is still recorded |
+| `--ignore-json-path POINTER` | this [JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901) is deleted from JSON request bodies before matching, e.g. `/request_id` |
+| `--match-header NAME` | this request header's value takes part in matching; headers play no part by default |
+| `--redact-header NAME` | the header's value is hidden in the cassette, the console and the journal; it still reaches the target |
+| `--redact-query-param NAME` | the same for a query parameter, which then no longer takes part in matching |
+| `--upstream-timeout SECONDS` | deadline for each whole exchange with the target (default 30) |
+
+The identity and redaction lists are stored in the cassette, so replay needs no flags.
+
+**The deadline** runs from the connect to the last byte of the response, however the
+target spreads its bytes. Your client sees nothing until that last byte, so set the
+deadline **below the client's own timeout**, with a margin: 290 for a client that waits
+300 seconds. A target that cannot be reached, fails TLS verification, or misses the
+deadline gets the client a `502` with `X-Httpmocker: upstream-error` and the cause; nothing
+is recorded, and the session is simply recorded again.
+
+### Replaying
+
+```bash
+httpmocker -p 8080 --replay cassettes/items.json
+```
+
+**Matching.** A request matches a recorded interaction when it has the same:
+- method and path;
+- query, in any order, without the ignored and redacted parameters;
+- body: JSON is compared as JSON, without the ignored paths, and any other body byte for
+  byte;
+- values of the matched headers.
+
+**Sequences.** Interactions that match the same request form a sequence: the first such
+request gets the first recorded response, the second the second, and so on.
+
+**Miss and exhausted.** A request with no recorded interaction (a **miss**), or one more
+than were recorded (**exhausted**), gets:
+- `500` with `X-Httpmocker: miss` or `exhausted`;
+- the request's key as the body;
+- a journal entry, and a line on the console that stands out.
+
+No status code is unambiguous against a real API, so assert on the journal:
+`miss + exhausted == 0`. `DELETE /_httpmocker/journal` starts every sequence over: use it
+between scenarios.
+
+### The cassette
+
+A cassette is JSON, written to be read and edited by hand. `cassettes/example.json` shows
+the format, here shortened to one interaction:
+
+```json
+{
+  "httpmocker_cassette": 1,
+  "target": "https://api.example.test",
+  "identity": {"ignore_query_params": ["ts"], "ignore_json_paths": ["/request_id"], "match_headers": []},
+  "redacted_headers": ["authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key"],
+  "interactions": [
+    {
+      "request": {"method": "PUT", "path": "/api/items/sample", "query": {"ts": ["1761048000"]},
+                  "headers": {"content-type": "application/json", "x-api-key": "<redacted>"},
+                  "body": {"name": "sample", "request_id": "r-1"}},
+      "response": {"status": 201, "headers": {"content-type": "application/json"},
+                   "body": {"id": 7, "name": "sample"}},
+      "meta": {"recorded_at": "2026-10-21T12:00:01.120Z", "duration_ms": 84, "delay_ms": 0}
+    }
+  ]
+}
+```
+
+**Editing by hand.** You can reorder, delete or add interactions, and set `meta.delay_ms` to
+replay a response slowly. A body is stored as `body` (JSON), `body_text` or `body_base64`.
+JSON bodies are replayed in compact form with sorted keys, so compare them as JSON.
+
+**Validation.** `httpmocker -p 8080 --replay <file> --validate-config` checks a cassette
+without serving it. Validation is strict: an unknown or misspelt field is an error, and so
+is a header name with a capital letter. A future cassette format may refuse version 1
+files unless its release says otherwise.
+
+**Redaction.** `Authorization`, `Proxy-Authorization`, `Cookie` and `Set-Cookie` are always
+redacted, plus whatever `--redact-header` and `--redact-query-param` name:
+- the cassette and the console show `<redacted>`;
+- replay does not send a redacted response header at all.
+
+Values inside request or response **bodies are never redacted**: do not record secrets in
+bodies, or edit them out by hand.
+
+### The journal
+
+In every mode, httpmocker keeps a journal of what it received:
+
+```bash
+curl http://localhost:8080/_httpmocker/journal              # counts and entries
+curl -X DELETE http://localhost:8080/_httpmocker/journal    # reset (and rewind replay)
+```
+
+```json
+{"counts": {"served": 2, "recorded": 0, "miss": 0, "exhausted": 0,
+            "upstream_error": 0, "rejected": 0, "unmatched": 1},
+ "dropped": 0,
+ "entries": [{"seq": 1, "received_at": "2026-10-21T12:00:00.123Z",
+              "request": {"method": "GET", "path": "/api/users", "query": {},
+                          "headers": {"authorization": "<redacted:0c9ae6066b41>"},
+                          "body_size": 0},
+              "outcome": "served", "status": 200}]}
+```
+
+**Entries.** There is one entry per exchange, with one outcome:
+- `served` and `unmatched` in config mode;
+- `recorded` and `upstream_error` in record mode;
+- `served`, `miss` and `exhausted` in replay;
+- `rejected` for a reserved path, in every mode.
+
+**Limits.** The journal keeps the last 10 000 entries. The counts are running totals since
+the last reset, and `dropped` says how many entries were evicted. A request body over
+64 KiB is not stored (`body_omitted`), but its `body_size` is.
+
+**Credentials** show as `<redacted:` + the first 12 hex digits of their SHA-256 + `>`, so a
+test can check which one was sent. The journal has no authentication, and anyone who can
+reach the port can read it and confirm guesses of weak secrets this way. Keep a mock with
+real traffic on a private network.
+
+### TLS
+
+Record mode checks the target's certificate, always. It trusts what the Python running
+httpmocker trusts (the OpenSSL default paths of its build); `SSL_CERT_FILE` or `SSL_CERT_DIR`
+override that. `SSL_CERT_FILE` *replaces* the default roots, so that file must hold every
+CA the run needs. There is no option to switch verification off.
+
+**On a host** that already trusts the target's CA, nothing needs to be set. To see where a
+Python looks:
+
+```bash
+python -c "import ssl; print(ssl.get_default_verify_paths())"
+```
+
+A uv-managed CPython looks in `/etc/ssl/cert.pem` and `/etc/ssl/certs`, not necessarily
+where your distribution keeps its bundle. A macOS python.org build trusts nothing until its
+`Install Certificates.command` has run.
+
+**In a container**, mount the CA file and point `SSL_CERT_FILE` at it (see the next
+section). The image trusts the Debian CA bundle by default and bundles no CA of its own.
+
+### Recording in a container
+
+Two rules:
+- **Mount the cassette's directory, not the file.** The cassette is replaced atomically
+  after every interaction, which a single-file bind mount does not allow: the server
+  refuses to start with `Device or resource busy`.
+- **Run as yourself** (`--user "$(id -u):$(id -g)"`). The file is then yours and can be
+  edited on the host; by default it belongs to the image's user (uid 999).
+
+```bash
+mkdir -p cassettes
+docker run --rm -p 8080:8080 --user "$(id -u):$(id -g)" \
+  -v "$(pwd)/cassettes:/app/cassettes" \
+  -v "$(pwd)/ca.pem:/app/ca.pem:ro" -e SSL_CERT_FILE=/app/ca.pem \
+  ghcr.io/janwychowaniak/httpmocker:0.3.0 \
+  httpmocker -p 8080 --record https://api.internal.example --cassette cassettes/items.json
+```
+
+With Docker Compose, record once, then replay in the test runs:
+
+```yaml
+services:
+  recorder:
+    image: ghcr.io/janwychowaniak/httpmocker:0.3.0
+    user: "1000:1000"            # your uid:gid, so that the cassette is yours
+    command: httpmocker -p 8080 --record https://api.internal.example --cassette cassettes/items.json
+    environment:
+      SSL_CERT_FILE: /app/ca.pem
+    volumes:
+      - ./cassettes:/app/cassettes
+      - ./ca.pem:/app/ca.pem:ro
+
+  mock:
+    image: ghcr.io/janwychowaniak/httpmocker:0.3.0
+    command: httpmocker -p 8080 --replay cassettes/items.json
+    volumes:
+      - ./cassettes:/app/cassettes:ro
+```
+
+### Limitations of record and replay
+
+- **Redirects and absolute URLs** (`Location`, links in bodies) are recorded verbatim, so on
+  replay they still point at the real API, and a client that follows them leaves the mock.
+- **Response bodies are not re-encoded.** A target that compresses despite
+  `Accept-Encoding: identity` is recorded and replayed with its `Content-Encoding`, as
+  received.
+- **No egress proxy**: `HTTPS_PROXY` and `NO_PROXY` are not used; the target must be
+  reachable directly.
+- **No streaming**: responses are read whole and sent whole. WebSocket is not supported.
+- **One cassette per recording session**: no appending, no merging, and replay never falls
+  back to the target. To grow a cassette, record again.
+- **Faults**: only `delay_ms`; no hangs or dropped connections.
 
 ## Project Structure
 
@@ -304,21 +563,32 @@ httpmocker/
 │   ├── config_loader.py        # Configuration parsing & validation
 │   ├── request_handler.py      # HTTP request processing & routing
 │   ├── console_formatter.py    # Console logging & output
+│   ├── record.py               # Record mode: forwarding, upstream client, cassette writer
+│   ├── replay.py               # Replay mode: request keys and sequences
+│   ├── cassette.py             # Cassette model and validation
+│   ├── journal.py              # Request journal and reserved paths
+│   ├── identity.py             # Request identity (the key replay matches on)
+│   ├── redaction.py            # Redaction of headers and query parameters
+│   ├── bodies.py               # Body representation in cassettes and the journal
+│   ├── headers.py              # Header sets and helpers
+│   ├── serving.py              # Send a recorded or forwarded response as given
 │   └── py.typed                # PEP 561 typing marker
-├── tests/                      # Unit tests
-│   ├── test_config_loader.py
-│   ├── test_request_handler.py
-│   ├── test_console_formatter.py
-│   └── test_main.py
+├── tests/                      # Unit tests, one file per module
 ├── configs/                    # API configuration files
 │   └── example.json            # Example config (copy to your own)
 ├── payloads/                   # External payload files
 │   ├── example.json
 │   └── urls_list.json
+├── cassettes/                  # Recorded conversations for --replay
+│   └── example.json            # Example cassette (hand-written)
+├── docs/
+│   └── record-replay.md        # Contract of record, replay and the journal
 ├── scripts/
 │   ├── gitleaks/               # Secret-scan hook scripts (wired via pre-commit)
-│   └── release/
-│       └── archive-image.sh    # Save the published image and prove it loads back
+│   ├── release/
+│   │   └── archive-image.sh    # Save the published image and prove it loads back
+│   └── smoke/
+│       └── replay-example.sh   # Replay the example cassette in an image (CI and release)
 ├── .github/                    # CI & automation
 │   ├── workflows/
 │   │   ├── ci.yml              # Lint/format/types, audit, Docker scan, tests
@@ -332,7 +602,7 @@ httpmocker/
 ├── .gitleaks.toml              # gitleaks rules (defaults + add-on provider rules)
 ├── pyproject.toml              # Packaging, dependencies & tooling config
 ├── uv.lock                     # Fully-pinned dependency lockfile
-├── smoke-tests.md              # curl calls for every endpoint of configs/example.json
+├── smoke-tests.md              # curl calls for configs/example.json and cassettes/example.json
 ├── .gitignore
 ├── CHANGELOG.md                # Notable changes
 ├── README.md                   # User-facing documentation
@@ -581,6 +851,19 @@ services:
       - ./payloads:/app/payloads:ro
 ```
 
+### Replaying with the published image
+
+Mount the directory that holds the cassette and name the cassette relative to `/app`:
+
+```bash
+docker run -d --name httpmocker -p 8080:8080 \
+  -v $(pwd)/cassettes:/app/cassettes:ro \
+  ghcr.io/janwychowaniak/httpmocker:0.3.0 \
+  httpmocker -p 8080 --replay cassettes/items.json
+```
+
+To record in a container, see [Recording in a container](#recording-in-a-container).
+
 ### Running with Docker
 
 The examples below use the locally built `httpmocker:latest`; substitute
@@ -728,6 +1011,9 @@ python -m httpmocker -p 8080 -c configs/example.json
 curl -X GET http://localhost:8080/api/users
 curl -X POST http://localhost:8080/api/login -d '{"username":"test"}'
 curl -X GET http://localhost:8080/health
+
+# Or replay the example cassette (see smoke-tests.md for its whole scenario)
+python -m httpmocker -p 8080 --replay cassettes/example.json
 ```
 
 **Docker development:**

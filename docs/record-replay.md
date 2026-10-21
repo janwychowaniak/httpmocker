@@ -543,11 +543,14 @@ As config mode has `configs/example.json` and `smoke-tests.md`, replay gets the 
   and `.dockerignore` keeps `cassettes/` out of the image.
 - **`smoke-tests.md`** gains a section with curl calls that replay the example cassette and query and
   reset the journal.
-- **CI.** The CI workflow's image job already builds the image for the Trivy scan. It also replays the
-  example cassette in that image and queries the journal, so a break shows on a push or a pull request.
-- **`release.yml`.** Before pushing the image, the release workflow runs the same replay and journal query
-  against the image it is about to publish. That step runs only on a tag; the CI job has exercised the
-  same check beforehand, but the release step's own first run is the 0.3.0 release.
+- **`scripts/smoke/replay-example.sh <image>`** replays the example cassette in a Docker image and
+  checks the answers (201, 409, exhausted, miss, `ok`), the journal counts and a reset. CI and the
+  release workflow both run it, so the release step runs the same code CI has already run.
+- **CI.** The CI workflow's image job already builds the image for the Trivy scan. It also runs the
+  script on that image, so a break shows on a push or a pull request.
+- **`release.yml`.** Before pushing the image, the release workflow runs the same script against the
+  image it is about to publish. That step runs only on a tag, so its own first run is the 0.3.0
+  release, but the script has run in CI on every push before.
 
 ## 18. Tests in the repository
 

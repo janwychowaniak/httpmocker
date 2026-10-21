@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Record and replay, for APIs that keep state. A config answers every request the same way,
+while a real API answers the second identical `PUT` with a conflict. httpmocker can now
+record a conversation with the real API and replay it, error bodies included. The contract
+is `docs/record-replay.md`; the README's "Record and replay" section is the guide.
+
 ### Added
 - Record mode: `httpmocker -p PORT --record TARGET_BASE_URL --cassette FILE` forwards
   every request to the target and returns its response. Each exchange is appended to the
@@ -24,26 +29,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - TLS verification is always on and uses the system trust store, which `SSL_CERT_FILE`
     / `SSL_CERT_DIR` override.
   - A cassette that already holds interactions is never overwritten.
-
-  See `docs/record-replay.md` §6-§8.
 - Replay mode: `httpmocker -p PORT --replay CASSETTE` serves a cassette, a JSON file of
-  recorded interactions. Each request is matched by an identity key: method, path,
-  query, and a JSON body in canonical form. The cassette's lists can leave out
-  volatile query parameters and JSON paths, or add headers to the key. Repeated
-  identical requests get the recorded responses in recorded order. A request with no
-  recorded interaction, or one past the end of its sequence, gets `500` with
-  `X-Httpmocker: miss` or `exhausted` and its key, and a journal entry.
-  `DELETE /_httpmocker/journal` rewinds every sequence.
-  `--replay CASSETTE --validate-config` checks a cassette without serving it, and
-  `cassettes/example.json` shows the format. See `docs/record-replay.md` §9-§10.
-- A request journal, for tests to assert on what the server received:
-  `GET /_httpmocker/journal` returns per-outcome counts and the entries (method, path,
-  query, headers, body, outcome and status of each exchange), and
-  `DELETE /_httpmocker/journal` resets it. It keeps the last 10 000 entries, with counts
-  as running totals and a `dropped` count, and omits request bodies over 64 KiB. Its
-  responses carry `X-Httpmocker: journal`. See `docs/record-replay.md` §12.
+  recorded interactions.
+  - Each request is matched by method, path, query and body, with a JSON body compared in
+    canonical form. The cassette's lists can leave volatile query parameters and JSON
+    paths out of matching, or add headers to it.
+  - Repeated identical requests get the recorded responses in recorded order.
+  - A request with no recorded interaction, or one past the end of its sequence, gets
+    `500` with `X-Httpmocker: miss` or `exhausted` and its key, and a journal entry.
+  - `--replay CASSETTE --validate-config` checks a cassette without serving it, strictly:
+    an unknown field is an error. `cassettes/example.json` shows the format.
+- A request journal in every mode, for tests to assert on what the server received.
+  - `GET /_httpmocker/journal` returns per-outcome counts and the entries: method, path,
+    query, headers, body, outcome and status of each exchange.
+  - `DELETE /_httpmocker/journal` resets it and rewinds every replay sequence.
+  - It keeps the last 10 000 entries, with counts as running totals and a `dropped`
+    count, and omits request bodies over 64 KiB.
+- Documentation: the README's "Record and replay" section covers recording in a container
+  (directory mount, `--user`, a CA mounted for `SSL_CERT_FILE`) and a Compose example.
+  `smoke-tests.md` gains the replay scenario. CI and the release workflow replay the
+  example cassette in the Docker image (`scripts/smoke/replay-example.sh`).
 
 ### Changed
+- The command line takes exactly one of `-c`, `--record` and `--replay`; with `-c` it
+  behaves as before.
 - Paths under `/_httpmocker` are reserved for the server: a config endpoint there fails
   validation, and a request there other than the journal gets `404` with
   `X-Httpmocker: reserved`.
