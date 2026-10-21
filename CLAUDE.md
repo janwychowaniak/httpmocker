@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 httpmocker is a standalone HTTP REST API mocker for integration and end-to-end testing. It serves predefined responses based on JSON configuration, simulating backend APIs with configurable delays and detailed logging.
 
+Version 0.3.0 is adding record and replay modes and a request journal. Their contract is
+`docs/record-replay.md`: read it before changing anything those features touch, keep it in
+sync as the build settles details, and where it differs from the README, it wins.
+
 ## Development Commands
 
 ### Running the Server
@@ -336,6 +340,8 @@ httpmocker/
 ├── payloads/                   # External payload files
 │   ├── example.json
 │   └── urls_list.json
+├── docs/
+│   └── record-replay.md        # Contract of record, replay and the journal (0.3.0)
 ├── scripts/
 │   ├── gitleaks/               # Secret-scan hook scripts (wired via pre-commit)
 │   └── release/

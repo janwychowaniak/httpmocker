@@ -55,6 +55,7 @@ tests/
 # Documentation
 # NOTE: README.md is required at build time (referenced by pyproject metadata).
 LICENSE
+docs/
 
 # Configs and payloads: mounted at run time, never part of the image
 configs/
