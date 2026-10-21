@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.0] - 2026-10-21
 
+`ghcr.io/janwychowaniak/httpmocker@sha256:99d8168c86f2cc9f189ab66985df33a7270b0c2a42deba2087fd4aa0f099703d`
+
+Image Id `sha256:0c144848db9bb9de93a3aef33669ec5e4ce0feaed69d1d39a528fcad023bebcc`, after a
+pull and after `docker load` of the release file alike. Python 3.14.8, on the same base image
+as 0.2.0 (Debian 13). The digest was read from the workflow's push and from a pull of the
+tag; the image can be pulled without logging in. The release files pass
+`sha256sum -c SHA256SUMS`, and the release body equals the tag message.
+
+On the published image:
+- `scripts/smoke/replay-example.sh` passes.
+- Recording through it from a replay of the example cassette, then replaying the new
+  cassette, gives identical answers over the whole scenario. The secret header value
+  appears in neither the cassette nor the log.
+- Recording through TLS works with a CA mounted for `SSL_CERT_FILE` and answers `502`
+  without it.
+- A cassette directory the image's user cannot write is refused at start.
+- Config mode reserves `/_httpmocker` and journals `served`, `rejected` and `unmatched`.
+
+The release workflow's new step, the replay of the example before the push, ran for the
+first time on this tag and passed, as did `actions/upload-artifact` 7.0.2 and
+`actions/download-artifact` 8.0.2.
+
 Record and replay, for APIs that keep state. A config answers every request the same way,
 while a real API answers the second identical `PUT` with a conflict. httpmocker can now
 record a conversation with the real API and replay it, error bodies included. The contract
