@@ -93,6 +93,10 @@ target. httpmocker's own request handler (`ClientPortRequestHandler`) therefore 
 **Methods.** GET, POST, PUT, DELETE, PATCH, HEAD and OPTIONS, in every mode. Any other method gets
 Bottle's own `405` and is **not journaled**: Bottle answers it before any httpmocker code runs.
 
+**Bodies are read as bytes**, never through Bottle's `request.json`. That parser answers a JSON body over
+100 KiB with `413` and a malformed one with `400`, which in 0.2.0 replaced config mode's configured
+response; 0.3.0 fixes it in every mode.
+
 **Chunked request bodies** are accepted in every mode. Bottle decodes `Transfer-Encoding: chunked` itself.
 In record mode such a body is forwarded with a computed `Content-Length` and recorded de-chunked.
 
@@ -544,7 +548,8 @@ These run against the published image and wheel. The repository's own suite cove
 10. **Back-compat.** Every 0.2.0 test stays unchanged and green. Config mode is unchanged except for:
     - the journal;
     - the reserved prefix;
-    - console redaction.
+    - console redaction;
+    - the fix of JSON request bodies that got `413` or `400` instead of the configured response (§4).
 
 ## 20. Documentation and release
 

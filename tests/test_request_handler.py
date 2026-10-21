@@ -32,7 +32,7 @@ class Response:
         return json.loads(self.body.decode("utf-8"))
 
 
-def request(app, method, path, query="", body=b"", headers=None):
+def request(app, method, path, query="", body=b"", headers=None, content_type=None):
     """Invoke the WSGI app and collect the response."""
     environ = {
         "REQUEST_METHOD": method,
@@ -50,6 +50,8 @@ def request(app, method, path, query="", body=b"", headers=None):
         "wsgi.run_once": False,
         "CONTENT_LENGTH": str(len(body)),
     }
+    if content_type:
+        environ["CONTENT_TYPE"] = content_type
     for name, value in (headers or {}).items():
         environ["HTTP_" + name.upper().replace("-", "_")] = value
 
@@ -321,3 +323,38 @@ class TestDelay:
         r = request(app, "GET", "/d")
         assert r.status == 200
         assert time.monotonic() - start >= 0.12
+
+
+class TestRequestBodies:
+    """The configured response is sent whatever the request body holds.
+
+    Printing the body used to go through Bottle's request.json, which answers a
+    JSON body over 100 KiB with 413 and malformed JSON with 400.
+    """
+
+    ENDPOINT = {
+        "method": "POST",
+        "path": "/items",
+        "status": 201,
+        "delay_ms": 0,
+        "payload_inline": {"created": True},
+    }
+
+    def test_large_json_body(self, capsys):
+        body = json.dumps({"blob": "x" * 200_000}).encode("utf-8")
+        r = request(
+            make_app([self.ENDPOINT]), "POST", "/items", body=body, content_type="application/json"
+        )
+        assert r.status == 201
+        assert r.json == {"created": True}
+
+    def test_malformed_json_body(self, capsys):
+        r = request(
+            make_app([self.ENDPOINT]),
+            "POST",
+            "/items",
+            body=b'{"name": ',
+            content_type="application/json",
+        )
+        assert r.status == 201
+        assert '{"name": ' in capsys.readouterr().out

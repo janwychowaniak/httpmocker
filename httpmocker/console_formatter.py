@@ -35,21 +35,19 @@ def log_request_received(request: BaseRequest, client_address: str) -> None:
     for header_name, header_value in request.headers.items():
         console.print(f"{header_name:<18} {header_value}", style="white")
 
-    # Request body (if present)
-    if hasattr(request, "json") and request.json:
-        console.print()  # Empty line
-        _print_json_payload(request.json)
-    elif request.body.read():
+    # Request body (if present). Read as bytes, never through Bottle's
+    # request.json: that answers a JSON body over 100 KiB with 413 and a
+    # malformed one with 400, in place of the response the server would send.
+    body = request.body.read()
+    request.body.seek(0)  # Reset body stream for potential re-reading
+    if body:
         console.print()  # Empty line
         try:
             # Try to parse as JSON for pretty printing
-            body_data = json.loads(request.body.read().decode("utf-8"))
-            _print_json_payload(body_data)
+            _print_json_payload(json.loads(body.decode("utf-8")))
         except (json.JSONDecodeError, UnicodeDecodeError):
             # If not JSON, print as plain text
-            console.print(request.body.read().decode("utf-8", errors="replace"), style="dim white")
-        # Reset body stream for potential re-reading
-        request.body.seek(0)
+            console.print(body.decode("utf-8", errors="replace"), style="dim white")
 
 
 def log_response_matched(

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- A request whose JSON body was over 100 KiB got Bottle's `413` page instead of the
+  configured response, and one whose body was declared `application/json` but did not
+  parse got `400`. Printing the body on the console went through Bottle's JSON parser,
+  which enforces both; the body is now read as bytes.
+
 ## [0.2.0] - 2026-10-14
 
 `ghcr.io/janwychowaniak/httpmocker@sha256:d4761f9827cac4c5549d45056833352ebaf58b6ea4e3e47a38fe4b40cc473706`
