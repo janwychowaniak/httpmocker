@@ -6,6 +6,7 @@ from rich.console import Console
 from rich.syntax import Syntax
 
 from .config_loader import Endpoint
+from .redaction import PLACEHOLDER, Redaction
 
 # Initialize Rich console for colored output
 console = Console()
@@ -14,25 +15,38 @@ console = Console()
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-def log_request_received(request: BaseRequest, client_address: str) -> None:
+def log_request_received(
+    request: BaseRequest, client_address: str, redaction: Redaction | None = None
+) -> None:
     """
     Log incoming HTTP request with full details.
+
+    Values of redacted headers and query parameters are printed as
+    ``<redacted>``; without ``redaction`` the default header list applies.
 
     Args:
         request: Bottle request object
         client_address: Client IP address and port
+        redaction: Names whose values are hidden
     """
+    if redaction is None:
+        redaction = Redaction()
+
     console.print()  # Empty line
     console.print("~" * 70, style="cyan")
     console.print()  # Empty line
     console.print(f"Connection received on localhost {client_address}", style="bright_white")
 
     # Request line
-    query_string = f"?{request.query_string}" if request.query_string else ""
+    query_string = (
+        f"?{redaction.query_string_of(request.query_string)}" if request.query_string else ""
+    )
     console.print(f"{request.method} {request.path}{query_string} HTTP/1.1", style="bright_yellow")
 
     # Headers
     for header_name, header_value in request.headers.items():
+        if header_name.lower() in redaction.headers:
+            header_value = PLACEHOLDER
         console.print(f"{header_name:<18} {header_value}", style="white")
 
     # Request body (if present). Read as bytes, never through Bottle's
@@ -88,6 +102,25 @@ def log_response_not_found(method: str, path: str) -> None:
     console.print()
 
     console.print(f"Response: 404 (no match for {method} {path})", style="bright_red")
+    console.print("...", style="dim yellow", end="")
+
+
+def log_response_reserved(method: str, path: str) -> None:
+    """
+    Log a request under the reserved prefix (404 with the marker header).
+
+    Args:
+        method: HTTP method
+        path: Request path
+    """
+    console.print()
+    console.print("-" * 70, style="dim cyan")
+    console.print()
+
+    console.print(
+        f"Response: 404 ({method} {path} is under the reserved prefix /_httpmocker)",
+        style="bright_red",
+    )
     console.print("...", style="dim yellow", end="")
 
 

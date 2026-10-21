@@ -4,6 +4,8 @@ from typing import Any, cast
 
 from pydantic import BaseModel, Field, field_validator
 
+from .journal import RESERVED_PREFIX, is_reserved_path
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # The methods the server routes. Bottle answers any other method with its own
@@ -41,7 +43,8 @@ class Endpoint(BaseModel):
 
         Matching ignores the query string and clients do not send the fragment, so
         a path with '?' or '#' would only match a request that encodes the
-        character as %3F or %23.
+        character as %3F or %23. Paths under /_httpmocker belong to the server
+        itself (the journal), so no endpoint can be served there.
         """
         if not v.startswith("/"):
             raise ValueError(f"Path must start with '/', got: {v!r}")
@@ -50,6 +53,11 @@ class Endpoint(BaseModel):
             raise ValueError(
                 f"Path must not contain '?' or '#', got: {v!r}; query strings and fragments"
                 f" are not part of matching, so use {base!r}, which answers any query string"
+            )
+        if is_reserved_path(v):
+            raise ValueError(
+                f"Path must not be under {RESERVED_PREFIX!r}, which httpmocker reserves for"
+                f" its journal, got: {v!r}"
             )
         return v
 

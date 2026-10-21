@@ -527,3 +527,44 @@ class TestEdgeCases:
         assert config.endpoints[0].method == "GET"
         assert config.endpoints[1].method == "POST"
         assert config.endpoints[2].method == "DELETE"
+
+
+class TestReservedPrefix:
+    """Paths under /_httpmocker belong to the server (the journal)."""
+
+    @pytest.mark.parametrize(
+        "path", ["/_httpmocker", "/_httpmocker/", "/_httpmocker/journal", "/_httpmocker/x/y"]
+    )
+    def test_reserved_path_rejected(self, path):
+        """Test that an endpoint under the reserved prefix is rejected."""
+        with pytest.raises(ValueError, match="reserves for its journal"):
+            Endpoint(method="GET", path=path, status=200, delay_ms=0, payload_inline={})
+
+    @pytest.mark.parametrize("path", ["/_httpmockerX", "/api/_httpmocker/journal"])
+    def test_lookalike_paths_accepted(self, path):
+        """Test that only the prefix itself and paths below it are reserved."""
+        endpoint = Endpoint(method="GET", path=path, status=200, delay_ms=0, payload_inline={})
+        assert endpoint.path == path
+
+    def test_config_with_reserved_path_fails_to_load(self, tmp_path, capsys):
+        """Test that loading reports the reserved path and exits 1."""
+        config_file = tmp_path / "config.json"
+        config_file.write_text(
+            json.dumps(
+                {
+                    "endpoints": [
+                        {
+                            "method": "GET",
+                            "path": "/_httpmocker/journal",
+                            "status": 200,
+                            "delay_ms": 0,
+                            "payload_inline": {},
+                        }
+                    ]
+                }
+            )
+        )
+        with pytest.raises(SystemExit) as exc_info:
+            load_config(str(config_file))
+        assert exc_info.value.code == 1
+        assert "/_httpmocker" in capsys.readouterr().out

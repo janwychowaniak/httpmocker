@@ -10,23 +10,42 @@ from .console_formatter import (
     log_request_received,
     log_response_matched,
     log_response_not_found,
+    log_response_reserved,
     log_response_sent,
 )
+from .journal import (
+    Journal,
+    describe_request,
+    install_journal,
+    is_reserved_path,
+    reserved_response,
+    timestamp,
+)
+from .redaction import Redaction
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-def create_app(config: Config) -> Bottle:
+def create_app(config: Config, journal: Journal | None = None) -> Bottle:
     """
     Create and configure Bottle application with endpoints.
 
+    Every request except those to the journal itself gets a journal entry:
+    ``served``, ``unmatched``, or ``rejected`` for a path under the reserved
+    prefix. The console and the journal redact the default header list.
+
     Args:
         config: Validated configuration object
+        journal: Journal to record into; a new one when not given
 
     Returns:
         Configured Bottle application
     """
     app = Bottle()
+    if journal is None:
+        journal = Journal()
+    redaction = Redaction()
+    install_journal(app, journal)
 
     # Create endpoint lookup dictionary for fast matching
     endpoint_map: dict[tuple[str, str], Endpoint] = {}
@@ -34,39 +53,45 @@ def create_app(config: Config) -> Bottle:
         key = (endpoint.method, endpoint.path)
         endpoint_map[key] = endpoint
 
-    @app.route("/<path:path>", method=list(SUPPORTED_METHODS))
-    def handle_request(path: str) -> dict[str, Any] | str:
-        """Handle all HTTP requests and match against configured endpoints."""
-        # Reconstruct full path with leading slash
-        full_path = f"/{path}" if path else "/"
+    def serve(full_path: str) -> dict[str, Any] | str:
+        """Log, answer and journal one request to ``full_path``."""
+        received_at = timestamp()
 
         # Get client address for logging
         client_address = f"{request.environ.get('REMOTE_ADDR', 'unknown')}:{request.environ.get('REMOTE_PORT', 'unknown')}"
 
         # Log incoming request
-        log_request_received(request, client_address)
+        log_request_received(request, client_address, redaction)
+        described = describe_request(request, full_path, redaction)
+
+        if is_reserved_path(full_path):
+            log_response_reserved(request.method, full_path)
+            reserved = reserved_response()
+            journal.add(described, received_at, "rejected", 404)
+            log_response_sent()
+            return reserved
 
         # Try to match endpoint
-        endpoint_key = (request.method, full_path)
-        endpoint = endpoint_map.get(endpoint_key)
-
+        endpoint = endpoint_map.get((request.method, full_path))
         if endpoint:
-            return _handle_matched_endpoint(endpoint)
-        return _handle_unmatched_request(request.method, full_path)
+            served = _handle_matched_endpoint(endpoint)
+            journal.add(described, received_at, "served", endpoint.status)
+            return served
+        unmatched = _handle_unmatched_request(request.method, full_path)
+        journal.add(described, received_at, "unmatched", 404)
+        return unmatched
+
+    @app.route("/<path:path>", method=list(SUPPORTED_METHODS))
+    def handle_request(path: str) -> dict[str, Any] | str:
+        """Handle all HTTP requests and match against configured endpoints."""
+        # Reconstruct full path with leading slash
+        return serve(f"/{path}" if path else "/")
 
     # Handle root path separately
     @app.route("/", method=list(SUPPORTED_METHODS))
     def handle_root() -> dict[str, Any] | str:
         """Handle requests to root path."""
-        client_address = f"{request.environ.get('REMOTE_ADDR', 'unknown')}:{request.environ.get('REMOTE_PORT', 'unknown')}"
-        log_request_received(request, client_address)
-
-        endpoint_key = (request.method, "/")
-        endpoint = endpoint_map.get(endpoint_key)
-
-        if endpoint:
-            return _handle_matched_endpoint(endpoint)
-        return _handle_unmatched_request(request.method, "/")
+        return serve("/")
 
     return app
 

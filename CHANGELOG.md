@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- A request journal, for tests to assert on what the server received:
+  `GET /_httpmocker/journal` returns per-outcome counts and the entries (method, path,
+  query, headers, body, outcome and status of each exchange), and
+  `DELETE /_httpmocker/journal` resets it. It keeps the last 10 000 entries, with counts
+  as running totals and a `dropped` count, and omits request bodies over 64 KiB. Its
+  responses carry `X-Httpmocker: journal`. See `docs/record-replay.md` §12.
+
+### Changed
+- Paths under `/_httpmocker` are reserved for the server: a config endpoint there fails
+  validation, and a request there other than the journal gets `404` with
+  `X-Httpmocker: reserved`.
+- The console prints the values of `Authorization`, `Proxy-Authorization`, `Cookie` and
+  `Set-Cookie` as `<redacted>`; the journal shows them as `<redacted:` + the first 12 hex
+  digits of their SHA-256 + `>`, so a test can still tell which credential was sent.
+
 ### Fixed
 - A request whose JSON body was over 100 KiB got Bottle's `413` page instead of the
   configured response, and one whose body was declared `application/json` but did not

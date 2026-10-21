@@ -6,6 +6,7 @@ exercises the real HTTP semantics (status codes, Content-Type, 204/HEAD
 handling, 404 fallback).
 """
 
+import hashlib
 import json
 import time
 from dataclasses import dataclass
@@ -14,6 +15,7 @@ from io import BytesIO
 import pytest
 
 from httpmocker.config_loader import Config
+from httpmocker.journal import Journal
 from httpmocker.request_handler import _interruptible_delay, create_app
 
 
@@ -358,3 +360,143 @@ class TestRequestBodies:
         )
         assert r.status == 201
         assert '{"name": ' in capsys.readouterr().out
+
+
+def journal_of(app):
+    """GET the journal through the app."""
+    r = request(app, "GET", "/_httpmocker/journal")
+    assert r.status == 200
+    return r.json
+
+
+ENDPOINT = {
+    "method": "POST",
+    "path": "/items",
+    "status": 201,
+    "delay_ms": 0,
+    "payload_inline": {"created": True},
+}
+
+
+class TestJournalEndpoint:
+    """GET / DELETE /_httpmocker/journal in config mode."""
+
+    def test_empty_journal(self):
+        r = request(make_app([ENDPOINT]), "GET", "/_httpmocker/journal")
+        assert r.status == 200
+        assert r.headers["X-Httpmocker"] == "journal"
+        assert r.content_type.startswith("application/json")
+        assert r.json == {
+            "counts": {
+                "served": 0,
+                "recorded": 0,
+                "miss": 0,
+                "exhausted": 0,
+                "upstream_error": 0,
+                "rejected": 0,
+                "unmatched": 0,
+            },
+            "dropped": 0,
+            "entries": [],
+        }
+
+    def test_served_and_unmatched_requests_are_journaled(self):
+        app = make_app([ENDPOINT])
+        request(
+            app,
+            "POST",
+            "/items",
+            query="dry=1",
+            body=b'{"name": "a"}',
+            content_type="application/json",
+        )
+        request(app, "GET", "/nothing")
+        journal = journal_of(app)
+        assert journal["counts"]["served"] == 1
+        assert journal["counts"]["unmatched"] == 1
+        served, unmatched = journal["entries"]
+        assert served["seq"] == 1
+        assert served["outcome"] == "served"
+        assert served["status"] == 201
+        assert served["request"]["method"] == "POST"
+        assert served["request"]["path"] == "/items"
+        assert served["request"]["query"] == {"dry": ["1"]}
+        assert served["request"]["body"] == {"name": "a"}
+        assert unmatched["outcome"] == "unmatched"
+        assert unmatched["status"] == 404
+        assert unmatched["request"]["path"] == "/nothing"
+
+    def test_root_path_is_journaled(self):
+        app = make_app([ENDPOINT])
+        request(app, "GET", "/")
+        assert journal_of(app)["entries"][0]["request"]["path"] == "/"
+
+    def test_journal_requests_are_not_journaled(self):
+        app = make_app([ENDPOINT])
+        journal_of(app)
+        request(app, "PUT", "/_httpmocker/journal")
+        assert journal_of(app)["entries"] == []
+
+    def test_delete_resets(self):
+        app = make_app([ENDPOINT])
+        request(app, "POST", "/items")
+        r = request(app, "DELETE", "/_httpmocker/journal")
+        assert r.status == 204
+        assert r.headers["X-Httpmocker"] == "journal"
+        assert r.body == b""
+        journal = journal_of(app)
+        assert journal["entries"] == []
+        assert journal["counts"]["served"] == 0
+        request(app, "POST", "/items")
+        assert journal_of(app)["entries"][0]["seq"] == 1
+
+    @pytest.mark.parametrize("method", ["POST", "PUT", "PATCH", "OPTIONS", "HEAD"])
+    def test_other_methods_get_405(self, method):
+        r = request(make_app([ENDPOINT]), method, "/_httpmocker/journal")
+        assert r.status == 405
+        assert r.headers["X-Httpmocker"] == "journal"
+        assert r.headers["Allow"] == "GET, DELETE"
+
+    def test_credentials_are_hashed_in_the_journal_and_hidden_on_the_console(self, capsys):
+        app = make_app([ENDPOINT])
+        request(app, "POST", "/items", headers={"Authorization": "Bearer s3cret"})
+        entry = journal_of(app)["entries"][0]
+        digest = hashlib.sha256(b"Bearer s3cret").hexdigest()[:12]
+        assert entry["request"]["headers"]["authorization"] == f"<redacted:{digest}>"
+        out = capsys.readouterr().out
+        assert "s3cret" not in out
+        assert "<redacted>" in out
+
+    def test_journal_is_kept_per_app(self):
+        first, second = make_app([ENDPOINT]), make_app([ENDPOINT])
+        request(first, "POST", "/items")
+        assert journal_of(second)["entries"] == []
+
+    def test_given_journal_is_used(self):
+        journal = Journal()
+        app = create_app(Config(endpoints=[ENDPOINT]), journal)
+        request(app, "POST", "/items")
+        assert journal.snapshot()["counts"]["served"] == 1
+
+
+class TestReservedPrefixAtRuntime:
+    @pytest.mark.parametrize(
+        "path", ["/_httpmocker", "/_httpmocker/", "/_httpmocker/other", "/_httpmocker/journal/"]
+    )
+    def test_reserved_paths_get_404_with_the_marker(self, path):
+        app = make_app([ENDPOINT])
+        r = request(app, "GET", path)
+        assert r.status == 404
+        assert r.headers["X-Httpmocker"] == "reserved"
+        assert r.json == {"httpmocker": "reserved"}
+        journal = journal_of(app)
+        assert journal["counts"]["rejected"] == 1
+        assert journal["entries"][0]["outcome"] == "rejected"
+        assert journal["entries"][0]["status"] == 404
+
+    def test_unmatched_404_has_no_marker(self):
+        """Config mode's own 404 stays exactly as in 0.2.0."""
+        r = request(make_app([ENDPOINT]), "GET", "/_httpmockerX")
+        assert r.status == 404
+        assert "X-Httpmocker" not in r.headers
+        assert r.json == {"error": "endpoint not found"}

@@ -139,3 +139,40 @@ class TestLogRequestReceived:
         request = make_request("POST", "/raw", body=b"plain text body", content_type="text/plain")
         cf.log_request_received(request, "x:1")
         assert "plain text body" in capsys.readouterr().out
+
+
+class TestLogRequestRedaction:
+    def test_default_list_is_redacted(self, capsys):
+        request = make_request(
+            "GET",
+            "/a",
+            headers={"Authorization": "Bearer s3cret", "Cookie": "sid=abc", "X-Client": "suite"},
+        )
+        cf.log_request_received(request, "x:1")
+        out = capsys.readouterr().out
+        assert "s3cret" not in out
+        assert "sid=abc" not in out
+        assert "<redacted>" in out
+        assert "suite" in out
+
+    def test_given_lists_redact_headers_and_query_params(self, capsys):
+        request = make_request(
+            "GET", "/a", query="api_key=s3cret&page=2", headers={"X-Api-Key": "k-123"}
+        )
+        redaction = cf.Redaction(
+            headers=frozenset({"x-api-key"}), query_params=frozenset({"api_key"})
+        )
+        cf.log_request_received(request, "x:1", redaction)
+        out = capsys.readouterr().out
+        assert "s3cret" not in out
+        assert "k-123" not in out
+        assert "?api_key=<redacted>&page=2" in out
+
+
+class TestLogResponseReserved:
+    def test_reserved(self, capsys):
+        cf.log_response_reserved("GET", "/_httpmocker/x")
+        out = capsys.readouterr().out
+        assert "404" in out
+        assert "GET /_httpmocker/x" in out
+        assert "reserved" in out

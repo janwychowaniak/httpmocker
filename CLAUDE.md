@@ -101,7 +101,8 @@ mypy httpmocker/
 The package is fully type-annotated and ships a `py.typed` marker. mypy runs in
 `strict` mode with the pydantic plugin; `bottle` has no type information, so its
 import is exempted via a per-module override in `pyproject.toml`, and a second
-override lets `request_handler` register its routes with Bottle's untyped decorator.
+override lets `request_handler` and `journal` register their routes with Bottle's untyped
+decorator.
 
 ### Pre-commit Hooks
 
@@ -192,7 +193,8 @@ next release.
 
 ### Core Components
 
-The application follows a clean separation of concerns with four main modules:
+The application follows a clean separation of concerns with four main modules, plus the
+ones 0.3.0 adds:
 
 1. **`__main__.py`** - CLI entry point
    - Argument parsing (`-p/--port`, one mode of `-c/--config`, `--record`, `--replay`,
@@ -210,8 +212,8 @@ The application follows a clean separation of concerns with four main modules:
 2. **`config_loader.py`** - Configuration management
    - Pydantic models for validation (`Endpoint`, `Config`)
    - Strict validation: HTTP methods must be uppercase and one of `SUPPORTED_METHODS` (the
-     seven the server routes), paths must start with `/` and contain no `?` or `#`,
-     status codes 100-599, non-negative delays
+     seven the server routes), paths must start with `/`, contain no `?` or `#` and not
+     lie under the reserved prefix `/_httpmocker`, status codes 100-599, non-negative delays
    - Each endpoint requires exactly one of `payload_inline` or `payload_file`
    - Validates at startup that payload files exist and hold valid JSON, reporting every
      problem with them at once; this runs only after the models validate, so a config
@@ -229,6 +231,9 @@ The application follows a clean separation of concerns with four main modules:
      - `HEAD` requests: match only endpoints configured with method `HEAD` (no fallback to
        the `GET` endpoint); Content-Type and Content-Length of the payload, empty body
    - Unmatched requests return 404 with `{"error": "endpoint not found"}`
+   - Every request except those to the journal gets a journal entry (`served`,
+     `unmatched`, or `rejected` for a path under `/_httpmocker`, which answers 404 with
+     `X-Httpmocker: reserved`); `create_app(config, journal=None)` takes the journal to use
    - Query parameters are logged but ignored for matching
    - Payload files are read on every request, so edits apply without a restart; one that
      disappears or breaks while the server runs gets a 500 from wsgiref (plain text,
@@ -236,10 +241,28 @@ The application follows a clean separation of concerns with four main modules:
 
 4. **`console_formatter.py`** - Rich console output
    - Uses the `rich` library for colored, formatted logging
-   - Logs all incoming requests with headers, query strings, and request bodies
-   - Pretty-prints JSON request bodies with syntax highlighting
+   - Logs all incoming requests with headers, query strings, and request bodies; values of
+     redacted headers (by default `Authorization`, `Proxy-Authorization`, `Cookie`,
+     `Set-Cookie`) and query parameters print as `<redacted>`
+   - Pretty-prints JSON request bodies with syntax highlighting; bodies are read as bytes,
+     never through Bottle's `request.json` (its 100 KiB limit and its 400 on malformed JSON
+     would replace the configured response)
    - Shows the matched endpoint's configuration (status, payload source, delay)
    - Startup banner and graceful shutdown messages
+
+5. **Modules of 0.3.0** (contract: `docs/record-replay.md`)
+   - `journal.py`: the in-memory `Journal` (last 10 000 entries, running counts,
+     `dropped`), `describe_request` (journal form of a request: transport headers left
+     out, redacted values hashed, bodies over 64 KiB omitted), the
+     `GET`/`DELETE /_httpmocker/journal` routes and the reserved prefix
+   - `redaction.py`: `Redaction` (header and query parameter names) and the placeholders:
+     `<redacted>` on the console and in cassettes, `<redacted:` + 12 hex of SHA-256 + `>`
+     in the journal
+   - `bodies.py`: body representation shared by cassettes and the journal (`body`,
+     `body_text`, `body_base64`)
+   - `headers.py`: transport and default redacted header sets, the raw environ keys, header
+     pairs and mappings
+   - `identity.py`: request identity for replay (JSON Pointer parsing so far)
 
 ### Data Flow
 
@@ -250,6 +273,7 @@ The application follows a clean separation of concerns with four main modules:
    - Look up `(method, path)` in endpoint dictionary
    - If matched: apply delay → set status → load payload → send response
    - If not matched: return 404
+   - Add a journal entry with the outcome and the status answered
    - Log response details and "sent" confirmation
 
 ### Key Design Decisions
@@ -281,6 +305,7 @@ The codebase includes comprehensive unit tests organized by module:
 - `tests/test_console_formatter.py` - payload-source formatting, request/response logging, and lifecycle banners
 - `tests/test_main.py` - CLI argument parsing (run modes, record options, target URL checks), port-availability checks (including a port left in TIME_WAIT), the `--validate-config` path, shutdown on SIGTERM, and the request handler (client port, interrupted requests, raw target and headers)
 - `tests/test_identity.py` - request identity helpers (JSON Pointer parsing so far)
+- `tests/test_journal.py`, `tests/test_redaction.py`, `tests/test_bodies.py`, `tests/test_headers.py` - the journal (entries, counts, cap, request descriptions), redaction, body representation and header helpers; the journal endpoint and the reserved prefix through the app are in `tests/test_request_handler.py`
 
 When adding features, follow the existing test structure with descriptive docstrings and organized test classes.
 
@@ -335,14 +360,21 @@ httpmocker/
 │   ├── config_loader.py        # Configuration & validation
 │   ├── request_handler.py      # HTTP handling & routing
 │   ├── console_formatter.py    # Logging & output
-│   ├── headers.py              # Transport and default redacted header sets (0.3.0)
+│   ├── headers.py              # Header sets and helpers (0.3.0)
 │   ├── identity.py             # Request identity for replay (0.3.0, in progress)
+│   ├── journal.py              # Request journal and reserved prefix (0.3.0)
+│   ├── redaction.py            # Redaction of headers and query parameters (0.3.0)
+│   ├── bodies.py               # Body representation for cassettes and journal (0.3.0)
 │   └── py.typed                # PEP 561 typing marker
 ├── tests/                      # Unit tests
 │   ├── test_config_loader.py
 │   ├── test_request_handler.py
 │   ├── test_console_formatter.py
 │   ├── test_identity.py
+│   ├── test_journal.py
+│   ├── test_redaction.py
+│   ├── test_bodies.py
+│   ├── test_headers.py
 │   └── test_main.py
 ├── configs/                    # API configuration files
 │   └── example.json            # Example config (copy to your own)

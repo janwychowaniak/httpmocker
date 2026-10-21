@@ -16,7 +16,12 @@ if TYPE_CHECKING:
 
 from .config_loader import load_config
 from .console_formatter import log_server_shutdown, log_server_startup
-from .headers import DEFAULT_REDACTED_HEADERS, TRANSPORT_HEADERS
+from .headers import (
+    DEFAULT_REDACTED_HEADERS,
+    RAW_HEADERS_KEY,
+    RAW_TARGET_KEY,
+    TRANSPORT_HEADERS,
+)
 from .identity import parse_json_pointer
 from .request_handler import create_app
 
@@ -250,11 +255,6 @@ def _inject_remote_port(environ: dict[str, Any], client_address: tuple[str, int]
     """
     environ["REMOTE_PORT"] = str(client_address[1])
     return environ
-
-
-# Server-specific environ keys (PEP 3333) holding the request as received
-RAW_TARGET_KEY = "httpmocker.raw_target"
-RAW_HEADERS_KEY = "httpmocker.raw_headers"
 
 
 def _inject_raw_request(environ: dict[str, Any], target: str, headers: Message) -> dict[str, Any]:
