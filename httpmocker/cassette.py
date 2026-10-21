@@ -2,6 +2,7 @@ import base64
 import binascii
 import json
 import os
+import re
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -16,6 +17,9 @@ from .identity import parse_json_pointer
 CASSETTE_FORMAT = 1
 
 BODY_FIELDS = ("body", "body_text", "body_base64")
+
+# Characters no header name or value can carry
+_FORBIDDEN_IN_HEADERS = re.compile(r"[\r\n\0]")
 
 
 def _check_header_names(names: list[str], what: str) -> list[str]:
@@ -43,11 +47,15 @@ class _Message(_Strict):
     @field_validator("headers")
     @classmethod
     def validate_headers(cls, v: dict[str, HeaderValue]) -> dict[str, HeaderValue]:
-        """Ensure lower-cased names and no empty list for a repeated header."""
+        """Ensure lower-cased names, no empty list for a repeated header, and no
+        CR, LF or NUL, which no header can carry on the wire."""
         _check_header_names(list(v), "Header names")
         for name, value in v.items():
             if isinstance(value, list) and not value:
                 raise ValueError(f"Header {name!r} has an empty list of values")
+            for text in [name, *(value if isinstance(value, list) else [value])]:
+                if _FORBIDDEN_IN_HEADERS.search(text):
+                    raise ValueError(f"Header {name!r} holds a CR, LF or NUL character")
         return v
 
     @field_validator("body_base64")

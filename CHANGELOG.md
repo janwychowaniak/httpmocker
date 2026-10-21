@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Replay mode: `httpmocker -p PORT --replay CASSETTE` serves a cassette, a JSON file of
+  recorded interactions. Each request is matched by an identity key: method, path,
+  query, and a JSON body in canonical form. The cassette's lists can leave out
+  volatile query parameters and JSON paths, or add headers to the key. Repeated
+  identical requests get the recorded responses in recorded order. A request with no
+  recorded interaction, or one past the end of its sequence, gets `500` with
+  `X-Httpmocker: miss` or `exhausted` and its key, and a journal entry.
+  `DELETE /_httpmocker/journal` rewinds every sequence.
+  `--replay CASSETTE --validate-config` checks a cassette without serving it, and
+  `cassettes/example.json` shows the format. See `docs/record-replay.md` §9-§10.
 - A request journal, for tests to assert on what the server received:
   `GET /_httpmocker/journal` returns per-outcome counts and the entries (method, path,
   query, headers, body, outcome and status of each exchange), and

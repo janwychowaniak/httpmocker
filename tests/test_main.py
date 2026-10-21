@@ -517,18 +517,55 @@ class TestMainValidateCassette:
         assert "At least one interaction" in capsys.readouterr().out
 
 
-class TestMainModesInProgress:
-    """Record and replay are parsed, but not served until they are built."""
+class TestMainReplay:
+    """--replay serves a cassette until stopped."""
 
-    @pytest.mark.parametrize(
-        ("argv", "mode"), [(RECORD, "record"), (("--replay", "c.json"), "replay")]
-    )
-    def test_mode_reports_it_is_not_available(self, monkeypatch, capsys, argv, mode):
-        monkeypatch.setattr("sys.argv", ["httpmocker", "-p", "8080", *argv])
+    @pytest.fixture(autouse=True)
+    def restore_sigterm_handler(self):
+        previous = signal.getsignal(signal.SIGTERM)
+        yield
+        signal.signal(signal.SIGTERM, previous)
+
+    def test_replay_starts_the_server_with_the_replay_app(self, monkeypatch, capsys):
+        example = str(Path(__file__).resolve().parent.parent / "cassettes" / "example.json")
+        monkeypatch.setattr("sys.argv", ["httpmocker", "-p", "0", "--replay", example])
+        served = {}
+
+        def fake_run(app, **kwargs):
+            served["app"] = app
+            served["kwargs"] = kwargs
+            raise KeyboardInterrupt
+
+        monkeypatch.setattr("httpmocker.__main__.run", fake_run)
+        main()
+        assert callable(served["app"])
+        assert served["kwargs"]["handler_class"] is ClientPortRequestHandler
+        out = capsys.readouterr().out
+        assert "starting up (replay)" in out
+        assert "Interactions:           7" in out
+        assert "shutting down" in out
+
+    def test_invalid_cassette_does_not_start(self, tmp_path, monkeypatch, capsys):
+        bad = tmp_path / "bad.json"
+        bad.write_text("{")
+        monkeypatch.setattr("sys.argv", ["httpmocker", "-p", "0", "--replay", str(bad)])
+        monkeypatch.setattr(
+            "httpmocker.__main__.run", lambda *a, **k: pytest.fail("server started")
+        )
         with pytest.raises(SystemExit) as exc_info:
             main()
         assert exc_info.value.code == 1
-        assert f"{mode} mode is not available yet" in capsys.readouterr().out
+
+
+class TestMainModesInProgress:
+    """Record mode is parsed, but not served until it is built."""
+
+    def test_record_reports_it_is_not_available(self, monkeypatch, capsys):
+        monkeypatch.setattr("sys.argv", ["httpmocker", "-p", "8080", *RECORD])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 1
+        assert "record mode is not available yet" in capsys.readouterr().out
 
 
 def capture_environ(send):

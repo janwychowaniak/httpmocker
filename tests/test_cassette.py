@@ -193,6 +193,14 @@ class TestInvalidCassettes:
         )
         assert_invalid(data, "Header names must be lower-case")
 
+    @pytest.mark.parametrize(
+        "headers",
+        [{"x-a": "v\r\nx-injected: 1"}, {"x-a": ["ok", "v\n"]}, {"x-\0": "v"}],
+    )
+    def test_header_with_cr_lf_or_nul(self, headers):
+        data = cassette(interactions=[interaction(response={"status": 200, "headers": headers})])
+        assert_invalid(data, "CR, LF or NUL")
+
     def test_empty_list_for_a_header(self):
         data = cassette(interactions=[interaction(response={"status": 200, "headers": {"x": []}})])
         assert_invalid(data, "empty list of values")

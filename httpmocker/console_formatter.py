@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from bottle import BaseRequest
 from rich.console import Console
@@ -7,6 +7,9 @@ from rich.syntax import Syntax
 
 from .config_loader import Endpoint
 from .redaction import PLACEHOLDER, Redaction
+
+if TYPE_CHECKING:
+    from .cassette import Cassette
 
 # Initialize Rich console for colored output
 console = Console()
@@ -148,6 +151,94 @@ def log_server_startup(port: int, config_file: str, endpoint_count: int) -> None
     console.print("=" * 70, style="bright_blue")
     console.print("Press Ctrl+C to stop", style="blue")
     console.print()
+
+
+def log_replay_startup(port: int, cassette_file: str, cassette: "Cassette") -> None:
+    """
+    Log replay startup: the cassette and the lists it was recorded with.
+
+    Args:
+        port: Server port
+        cassette_file: Cassette file path
+        cassette: The loaded cassette
+    """
+
+    def listed(names: list[str]) -> str:
+        return ", ".join(names) if names else "-"
+
+    console.print()
+    console.print("=" * 70, style="bright_blue")
+    console.print("httpmocker starting up (replay)", style="bright_blue bold")
+    console.print("=" * 70, style="bright_blue")
+    console.print(f"Port:                   {port}", style="blue")
+    console.print(f"Cassette:               {cassette_file}", style="blue")
+    console.print(f"Interactions:           {len(cassette.interactions)}", style="blue")
+    if cassette.target:
+        console.print(f"Recorded from:          {cassette.target}", style="blue")
+    console.print(
+        f"Ignored query params:   {listed(cassette.identity.ignore_query_params)}", style="blue"
+    )
+    console.print(
+        f"Ignored JSON paths:     {listed(cassette.identity.ignore_json_paths)}", style="blue"
+    )
+    console.print(
+        f"Matched headers:        {listed(cassette.identity.match_headers)}", style="blue"
+    )
+    console.print(f"Redacted headers:       {listed(cassette.redacted_headers)}", style="blue")
+    console.print(f"Redacted query params:  {listed(cassette.redacted_query_params)}", style="blue")
+    console.print("=" * 70, style="bright_blue")
+    console.print("Press Ctrl+C to stop", style="blue")
+    console.print()
+
+
+def log_replay_served(
+    method: str, path: str, status: int, index: int, position: int, total: int, delay_ms: int
+) -> None:
+    """
+    Log a request answered from the cassette.
+
+    Args:
+        method: HTTP method
+        path: Request path
+        status: Recorded status sent
+        index: 0-based index of the interaction in the cassette
+        position: Which response of the request's sequence this is, from 1
+        total: Length of the request's sequence
+        delay_ms: Delay applied before answering
+    """
+    console.print()
+    console.print("-" * 70, style="dim cyan")
+    console.print()
+
+    console.print(
+        f"Response: {method} {path} → {status} served #{index} ({position}/{total})",
+        style="bright_green",
+    )
+    if delay_ms > 0:
+        console.print(f" - delay_ms:       {delay_ms}", style="green")
+    console.print("...", style="dim yellow", end="")
+
+
+def log_replay_unanswered(outcome: str, method: str, path: str, total: int) -> None:
+    """
+    Log a request the cassette has no response for, so that it stands out.
+
+    Args:
+        outcome: "miss" (no interaction for the request) or "exhausted" (all used)
+        method: HTTP method
+        path: Request path
+        total: Length of the request's sequence (exhausted)
+    """
+    console.print()
+    console.print("-" * 70, style="dim cyan")
+    console.print()
+
+    if outcome == "miss":
+        reason = "no recorded interaction for this request"
+    else:
+        reason = f"all {total} recorded response(s) for this request were used"
+    console.print(f"{outcome.upper()}: {method} {path} → 500, {reason}", style="bold white on red")
+    console.print("...", style="dim yellow", end="")
 
 
 def log_server_shutdown() -> None:

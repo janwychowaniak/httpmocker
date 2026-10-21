@@ -1,4 +1,5 @@
 from collections import deque
+from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import parse_qsl
@@ -83,6 +84,11 @@ class Journal:
         self._counts = dict.fromkeys(OUTCOMES, 0)
         self._dropped = 0
         self._seq = 0
+        self._reset_hooks: list[Callable[[], None]] = []
+
+    def on_reset(self, hook: Callable[[], None]) -> None:
+        """Call ``hook`` on every reset, e.g. to rewind replay's sequence positions."""
+        self._reset_hooks.append(hook)
 
     def add(
         self,
@@ -91,6 +97,7 @@ class Journal:
         outcome: str,
         status: int,
         interaction_index: int | None = None,
+        key: dict[str, Any] | None = None,
     ) -> None:
         """
         Add an entry for one exchange.
@@ -101,6 +108,7 @@ class Journal:
             outcome: One of ``OUTCOMES``
             status: Status code answered
             interaction_index: Cassette index of the interaction served (replay)
+            key: Request key of a miss or an exhausted sequence (replay)
         """
         if outcome not in self._counts:
             raise ValueError(f"Unknown journal outcome: {outcome}")
@@ -116,6 +124,8 @@ class Journal:
         }
         if interaction_index is not None:
             entry["interaction_index"] = interaction_index
+        if key is not None:
+            entry["key"] = key
         self._entries.append(entry)
         self._counts[outcome] += 1
 
@@ -128,11 +138,13 @@ class Journal:
         }
 
     def reset(self) -> None:
-        """Clear the entries and zero the counts, ``dropped`` and ``seq``."""
+        """Clear the entries, zero the counts, ``dropped`` and ``seq``, and run the reset hooks."""
         self._entries.clear()
         self._counts = dict.fromkeys(OUTCOMES, 0)
         self._dropped = 0
         self._seq = 0
+        for hook in self._reset_hooks:
+            hook()
 
 
 def timestamp() -> str:

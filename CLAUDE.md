@@ -23,6 +23,10 @@ python -m httpmocker -p 8080 -c configs/example.json
 
 # Validate configuration without starting server
 python -m httpmocker -p 8080 -c configs/config.json --validate-config
+
+# Replay a cassette (0.3.0), or only validate it
+python -m httpmocker -p 8080 --replay cassettes/example.json
+python -m httpmocker -p 8080 --replay cassettes/example.json --validate-config
 ```
 
 ### Testing
@@ -101,8 +105,8 @@ mypy httpmocker/
 The package is fully type-annotated and ships a `py.typed` marker. mypy runs in
 `strict` mode with the pydantic plugin; `bottle` has no type information, so its
 import is exempted via a per-module override in `pyproject.toml`, and a second
-override lets `request_handler` and `journal` register their routes with Bottle's untyped
-decorator.
+override lets `request_handler`, `journal` and `replay` register their routes with Bottle's
+untyped decorator.
 
 ### Pre-commit Hooks
 
@@ -199,8 +203,9 @@ ones 0.3.0 adds:
 1. **`__main__.py`** - CLI entry point
    - Argument parsing (`-p/--port`, one mode of `-c/--config`, `--record`, `--replay`,
      `--validate-config`); the record options are checked and normalized here.
-     `--replay FILE --validate-config` validates a cassette; record and replay are not
-     served yet: 0.3.0 is building them step by step
+     `--replay FILE` serves a cassette through `replay.create_replay_app`, and with
+     `--validate-config` only validates it; record mode is not served yet: 0.3.0 is
+     building it
    - `ClientPortRequestHandler` adds the request target and headers as received to the
      environ (`httpmocker.raw_target`, `httpmocker.raw_headers`), since wsgiref
      percent-decodes `PATH_INFO` and folds repeated headers
@@ -266,7 +271,15 @@ ones 0.3.0 adds:
      status and delay checks of `config_loader` (`check_method`, `check_path`, ...)
    - `headers.py`: transport and default redacted header sets, the raw environ keys, header
      pairs and mappings
-   - `identity.py`: request identity for replay (JSON Pointer parsing so far)
+   - `identity.py`: the request key of replay (`RequestKey`: method, decoded path, sorted
+     query pairs, canonical JSON or raw body, matched header values), JSON Pointer
+     parsing and deletion, and `render_key` for miss and exhausted answers
+   - `replay.py`: `create_replay_app` (sequences per key in `Player`, rewound by a journal
+     reset; miss and exhausted answer 500 with the marker), the keys of recorded and live
+     requests, and `body_bytes` of a recorded body
+   - `serving.py`: `send_as_given` sends a recorded (later: forwarded) status, headers and
+     body exactly; `without_default_content_type` wraps the app so that Bottle's default
+     `Content-Type: text/html` is not added to a response recorded without one
 
 ### Data Flow
 
@@ -308,7 +321,9 @@ The codebase includes comprehensive unit tests organized by module:
 - `tests/test_request_handler.py` - the WSGI app: endpoint matching, method/status handling, HTTP semantics (204, HEAD), payload files (object/array), and delays
 - `tests/test_console_formatter.py` - payload-source formatting, request/response logging, and lifecycle banners
 - `tests/test_main.py` - CLI argument parsing (run modes, record options, target URL checks), port-availability checks (including a port left in TIME_WAIT), the `--validate-config` path, shutdown on SIGTERM, and the request handler (client port, interrupted requests, raw target and headers)
-- `tests/test_identity.py` - request identity helpers (JSON Pointer parsing so far)
+- `tests/test_identity.py` - the request key: JSON Pointer parsing and deletion, body, query and header keys, rendering
+- `tests/test_replay.py` - replay through the app: the example scenario (round trip, exhausted, miss, reset), identity (ignore lists, canonical JSON, match headers, redacted query params), serving (sequences, body representations, exact headers, HEAD, delay) and redaction
+- `tests/test_serving.py` - sending a response exactly as given
 - `tests/test_cassette.py` - the cassette model (defaults, every validation rule, the shipped `cassettes/example.json`) and `load_cassette`
 - `tests/test_journal.py`, `tests/test_redaction.py`, `tests/test_bodies.py`, `tests/test_headers.py` - the journal (entries, counts, cap, request descriptions), redaction, body representation and header helpers; the journal endpoint and the reserved prefix through the app are in `tests/test_request_handler.py`
 
@@ -366,7 +381,9 @@ httpmocker/
 │   ├── request_handler.py      # HTTP handling & routing
 │   ├── console_formatter.py    # Logging & output
 │   ├── headers.py              # Header sets and helpers (0.3.0)
-│   ├── identity.py             # Request identity for replay (0.3.0, in progress)
+│   ├── identity.py             # Request key of replay (0.3.0)
+│   ├── replay.py               # Replay mode app (0.3.0)
+│   ├── serving.py              # Send a recorded or forwarded response as given (0.3.0)
 │   ├── journal.py              # Request journal and reserved prefix (0.3.0)
 │   ├── redaction.py            # Redaction of headers and query parameters (0.3.0)
 │   ├── bodies.py               # Body representation for cassettes and journal (0.3.0)
@@ -378,6 +395,8 @@ httpmocker/
 │   ├── test_console_formatter.py
 │   ├── test_identity.py
 │   ├── test_cassette.py
+│   ├── test_replay.py
+│   ├── test_serving.py
 │   ├── test_journal.py
 │   ├── test_redaction.py
 │   ├── test_bodies.py

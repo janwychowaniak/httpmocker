@@ -187,3 +187,18 @@ class TestDescribeRequest:
         request = make_request(body=b"payload")
         describe_request(request, "/v1/items", Redaction())
         assert request.body.read() == b"payload"
+
+
+class TestJournalReplayHooks:
+    def test_reset_runs_the_hooks(self):
+        journal = Journal()
+        calls = []
+        journal.on_reset(lambda: calls.append("rewind"))
+        journal.reset()
+        journal.reset()
+        assert calls == ["rewind", "rewind"]
+
+    def test_key_is_kept_on_the_entry(self):
+        journal = Journal()
+        journal.add({"method": "GET"}, "t", "miss", 500, key={"method": "GET", "path": "/a"})
+        assert journal.snapshot()["entries"][0]["key"] == {"method": "GET", "path": "/a"}

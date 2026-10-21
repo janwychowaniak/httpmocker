@@ -176,3 +176,53 @@ class TestLogResponseReserved:
         assert "404" in out
         assert "GET /_httpmocker/x" in out
         assert "reserved" in out
+
+
+class TestLogReplay:
+    def test_startup_lists_the_cassette_and_its_lists(self, capsys):
+        from httpmocker.cassette import Cassette
+
+        cassette = Cassette(
+            httpmocker_cassette=1,
+            target="https://api.example.test",
+            identity={"ignore_query_params": ["ts"], "ignore_json_paths": ["/request_id"]},
+            redacted_query_params=["api_key"],
+            interactions=[
+                {"request": {"method": "GET", "path": "/a"}, "response": {"status": 200}}
+            ],
+        )
+        cf.log_replay_startup(8080, "cassettes/c.json", cassette)
+        out = capsys.readouterr().out
+        assert "replay" in out
+        assert "cassettes/c.json" in out
+        assert "https://api.example.test" in out
+        assert "ts" in out
+        assert "/request_id" in out
+        assert "api_key" in out
+        assert "authorization, proxy-authorization, cookie, set-cookie" in out
+
+    def test_startup_without_target(self, capsys):
+        from httpmocker.cassette import Cassette
+
+        cassette = Cassette(
+            httpmocker_cassette=1,
+            interactions=[
+                {"request": {"method": "GET", "path": "/a"}, "response": {"status": 200}}
+            ],
+        )
+        cf.log_replay_startup(8080, "c.json", cassette)
+        assert "Recorded from" not in capsys.readouterr().out
+
+    def test_served_with_and_without_delay(self, capsys):
+        cf.log_replay_served("PUT", "/v1/items", 201, 5, 2, 3, 0)
+        cf.log_replay_served("GET", "/v1/items", 200, 6, 1, 1, 250)
+        out = capsys.readouterr().out
+        assert "PUT /v1/items → 201 served #5 (2/3)" in out
+        assert "delay_ms:       250" in out
+
+    def test_unanswered(self, capsys):
+        cf.log_replay_unanswered("miss", "PUT", "/v1/b", 0)
+        cf.log_replay_unanswered("exhausted", "PUT", "/v1/a", 2)
+        out = capsys.readouterr().out
+        assert "MISS: PUT /v1/b → 500, no recorded interaction" in out
+        assert "EXHAUSTED: PUT /v1/a → 500, all 2 recorded response(s)" in out

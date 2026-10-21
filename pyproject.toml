@@ -91,7 +91,7 @@ ignore_missing_imports = true
 # The WSGI routes are registered with Bottle's (untyped) `@app.route`
 # decorator, which strict mode would otherwise flag as making the handlers
 # untyped. The handlers themselves are fully annotated.
-module = ["httpmocker.request_handler", "httpmocker.journal"]
+module = ["httpmocker.request_handler", "httpmocker.journal", "httpmocker.replay"]
 disallow_untyped_decorators = false
 
 [tool.pydantic-mypy]

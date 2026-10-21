@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 from .cassette import load_cassette
 from .config_loader import load_config
-from .console_formatter import log_server_shutdown, log_server_startup
+from .console_formatter import log_replay_startup, log_server_shutdown, log_server_startup
 from .headers import (
     DEFAULT_REDACTED_HEADERS,
     RAW_HEADERS_KEY,
@@ -24,6 +24,7 @@ from .headers import (
     TRANSPORT_HEADERS,
 )
 from .identity import parse_json_pointer
+from .replay import create_replay_app
 from .request_handler import create_app
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -360,30 +361,37 @@ def main() -> None:
             print(f"✓ Found {len(cassette.interactions)} interaction(s)")
             return
 
-        # Record and replay are being built (docs/record-replay.md)
-        if args.config is None:
-            mode = "record" if args.record is not None else "replay"
-            print(f"Error: {mode} mode is not available yet")
+        # Record mode is being built (docs/record-replay.md)
+        if args.record is not None:
+            print("Error: record mode is not available yet")
             sys.exit(1)
 
-        # Load and validate configuration
-        config = load_config(args.config)
+        app: WSGIApplication
+        if args.replay is not None:
+            # Serve a cassette
+            cassette = load_cassette(args.replay)
+            check_port_available(args.port)
+            app = create_replay_app(cassette)
+            log_replay_startup(args.port, args.replay, cassette)
+        else:
+            # Load and validate configuration
+            config = load_config(args.config)
 
-        # If only validating config, exit after successful validation
-        if args.validate_config:
-            print(f"✓ Configuration file '{args.config}' is valid")
-            print(f"✓ Found {len(config.endpoints)} endpoint(s)")
-            print("✓ All payload files exist and hold valid JSON")
-            return
+            # If only validating config, exit after successful validation
+            if args.validate_config:
+                print(f"✓ Configuration file '{args.config}' is valid")
+                print(f"✓ Found {len(config.endpoints)} endpoint(s)")
+                print("✓ All payload files exist and hold valid JSON")
+                return
 
-        # Check if port is available
-        check_port_available(args.port)
+            # Check if port is available
+            check_port_available(args.port)
 
-        # Create Bottle application
-        app = create_app(config)
+            # Create Bottle application
+            app = create_app(config)
 
-        # Log startup information
-        log_server_startup(args.port, args.config, len(config.endpoints))
+            # Log startup information
+            log_server_startup(args.port, args.config, len(config.endpoints))
 
         # Stop on SIGTERM exactly as on Ctrl+C
         signal.signal(signal.SIGTERM, _shutdown_on_sigterm)

@@ -234,6 +234,7 @@ a hand-written cassette:
 - Names are lower-cased; validation refuses a name with a capital letter, here and in `match_headers` and
   `redacted_headers`.
 - A repeated header is a non-empty list of strings; otherwise the value is a string.
+- No name or value may hold a CR, LF or NUL character, which no header can carry on the wire.
 - A redacted header's value is `<redacted>`.
 
 **Bodies.** Exactly one representation, or none; an empty body has none.
@@ -302,7 +303,11 @@ It checks:
      is a no-op.
    - Otherwise: the raw bytes.
    - For a cassette request, the bytes are first rebuilt from whichever representation it carries, so a
-     live request and its recording key identically.
+     live request and its recording key identically. A recorded `body` keys as JSON whatever the
+     request's headers say: the representation itself says the body is JSON, which helps a hand-added
+     interaction without a `content-type`.
+   - The media type comes from the live request's `Content-Type`, or from the recorded request's
+     `content-type` header (its first value).
 5. **Headers**: the values of the headers named in `match_headers` (lower-cased names), taken from the raw
    list and compared exactly. An absent header keys as *absent*, distinct from an empty value. A repeated
    header keys as the list of its values in order. By default the list is empty, so headers never take
@@ -316,7 +321,10 @@ No wildcards, no partial matches, no scoring: two requests are the same iff thei
 - Positions count per key from server start and are reset by `DELETE /_httpmocker/journal`.
 
 **Serving a match**
-- The interaction's status, headers and body (§9).
+- The interaction's status, headers and body (§9), exactly. Header names go out as stored, lower-cased.
+  A response recorded without a `content-type` goes out without one: Bottle's default
+  `Content-Type: text/html` is removed. `Content-Length` is computed from the body, except on `HEAD`
+  (§5).
 - Response headers listed in the cassette's `redacted_headers` (e.g. `set-cookie`) are not sent at all.
   Their recorded values are placeholders.
 - `meta.delay_ms` is applied, interruptibly, as in config mode.
@@ -325,8 +333,8 @@ No wildcards, no partial matches, no scoring: two requests are the same iff thei
 of its sequence is **exhausted**. Either one gets:
 - status `500` with `X-Httpmocker: miss` or `exhausted`;
 - the JSON body `{"httpmocker": "miss" | "exhausted", "key": {…}}`;
-- a journal entry carrying the key;
-- a line that stands out on the console.
+- a journal entry carrying the key in its `key` field;
+- a line that stands out on the console (§15).
 
 The `key` object is `{"method", "path", "query", "body", "headers"}`:
 - `body` follows the §9 representation rules, with the JSON one in canonical form, and is omitted when
@@ -439,6 +447,7 @@ exchange is `recorded`, never also `served`.
 - `outcome` and `status`, the status answered.
 - `interaction_index` in replay, when an interaction was served: the 0-based index into the cassette's
   `interactions`. The console shows the same number.
+- `key` in replay, on a `miss` or `exhausted` entry: the request key as the answer's body shows it (§10).
 
 **Exposure.** The journal is unauthenticated on every interface the server binds. Its hashes let anyone
 who can reach it confirm guesses of weak secrets, such as Basic-auth passwords. That is acceptable for a
@@ -476,8 +485,10 @@ journal outcome `unmatched` already identifies those requests.
 - **The block.** Each request gets the multi-line block as in config mode: request line, headers (redacted,
   §11), pretty-printed body. Record and replay close it with a one-line verdict:
   - record: `PUT /v1/items → 201 (123 ms) recorded #5`
-  - replay: `PUT /v1/items → 201 served #5 (2/3)`
-  - miss or exhausted: a line that stands out.
+  - replay: `PUT /v1/items → 201 served #5 (2/3)`: interaction 5 of the cassette, the second of the
+    three recorded for this request;
+  - miss or exhausted, in white on red: `MISS: PUT /v1/b → 500, no recorded interaction for this
+    request` or `EXHAUSTED: PUT /v1/a → 500, all 2 recorded response(s) for this request were used`.
 - **Startup.**
   - Record prints the target, the cassette, the deadline and the lists.
   - Replay prints the cassette and the lists it loaded.
