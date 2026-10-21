@@ -345,7 +345,9 @@ httpmocker -p 8080 --record https://api.example.test --cassette cassettes/items.
   query appended to the base (which may have a path prefix), the headers in order, and the
   body.
   - `Host` is set to the target's.
-  - `Accept-Encoding: identity` is sent, so bodies arrive readable.
+  - `Accept-Encoding: identity` is sent, so bodies arrive readable. The cassette keeps the
+    client's own `Accept-Encoding`, as sent; Python's `http.client` sends `identity` by
+    itself, so a cassette can show it even when your code never sets the header.
   - Redirects are returned to the client, not followed.
 
   The target's status, headers and body go back to the client unchanged.
