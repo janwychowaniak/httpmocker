@@ -10,6 +10,7 @@ from .redaction import PLACEHOLDER, Redaction
 
 if TYPE_CHECKING:
     from .cassette import Cassette
+    from .record import RecordSettings
 
 # Initialize Rich console for colored output
 console = Console()
@@ -238,6 +239,78 @@ def log_replay_unanswered(outcome: str, method: str, path: str, total: int) -> N
     else:
         reason = f"all {total} recorded response(s) for this request were used"
     console.print(f"{outcome.upper()}: {method} {path} → 500, {reason}", style="bold white on red")
+    console.print("...", style="dim yellow", end="")
+
+
+def log_record_startup(port: int, settings: "RecordSettings") -> None:
+    """
+    Log record startup: the target, the cassette, the deadline and the lists.
+
+    Args:
+        port: Server port
+        settings: The --record options
+    """
+
+    def listed(names: list[str] | tuple[str, ...]) -> str:
+        return ", ".join(names) if names else "-"
+
+    console.print()
+    console.print("=" * 70, style="bright_blue")
+    console.print("httpmocker starting up (record)", style="bright_blue bold")
+    console.print("=" * 70, style="bright_blue")
+    console.print(f"Port:                   {port}", style="blue")
+    console.print(f"Target:                 {settings.target}", style="blue")
+    console.print(f"Cassette:               {settings.cassette}", style="blue")
+    console.print(f"Upstream deadline:      {settings.upstream_timeout:g} s", style="blue")
+    console.print(f"Ignored query params:   {listed(settings.ignore_query_params)}", style="blue")
+    console.print(f"Ignored JSON paths:     {listed(settings.ignore_json_paths)}", style="blue")
+    console.print(f"Matched headers:        {listed(settings.match_headers)}", style="blue")
+    console.print(f"Redacted headers:       {listed(settings.redacted_headers)}", style="blue")
+    console.print(f"Redacted query params:  {listed(settings.redact_query_params)}", style="blue")
+    console.print("=" * 70, style="bright_blue")
+    console.print("Press Ctrl+C to stop", style="blue")
+    console.print()
+
+
+def log_record_recorded(method: str, path: str, status: int, duration_ms: int, index: int) -> None:
+    """
+    Log an exchange forwarded to the target and recorded.
+
+    Args:
+        method: HTTP method
+        path: Request path
+        status: The target's status
+        duration_ms: What the target took
+        index: 0-based index of the interaction in the cassette
+    """
+    console.print()
+    console.print("-" * 70, style="dim cyan")
+    console.print()
+
+    console.print(
+        f"Response: {method} {path} → {status} ({duration_ms} ms) recorded #{index}",
+        style="bright_green",
+    )
+    console.print("...", style="dim yellow", end="")
+
+
+def log_record_upstream_error(method: str, path: str, cause: str) -> None:
+    """
+    Log a request the target did not answer in full, so that it stands out.
+
+    Args:
+        method: HTTP method
+        path: Request path
+        cause: Why the exchange failed
+    """
+    console.print()
+    console.print("-" * 70, style="dim cyan")
+    console.print()
+
+    console.print(
+        f"UPSTREAM ERROR: {method} {path} → 502, {cause}; nothing recorded",
+        style="bold white on red",
+    )
     console.print("...", style="dim yellow", end="")
 
 

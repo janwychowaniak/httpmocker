@@ -128,7 +128,9 @@ included; only redaction (§11) changes what it prints.
 
 **Forwarding the request**
 - Method, and the URL as base URL + raw path, plus `?` + raw query when there is one.
-- Every non-transport header as received, and the body bytes.
+- Every non-transport header as received, in order and with repeats, and the body bytes.
+  `Content-Length` is computed from the body. `POST`, `PUT` and `PATCH` send `Content-Length: 0` when they
+  have no body; other methods send none.
 - `Host` is the target's `host[:port]` as written, a non-default port included.
 - `Accept-Encoding: identity` **replaces** the client's value on the wire, so bodies land readable. The
   cassette and the journal keep the client's header as received.
@@ -145,7 +147,14 @@ included; only redaction (§11) changes what it prints.
 
 **Upstream failure** (target unreachable, TLS failure, deadline exceeded)
 - The client gets `502` with `X-Httpmocker: upstream-error` and the body
-  `{"httpmocker": "upstream-error", "cause": "<text>"}`.
+  `{"httpmocker": "upstream-error", "cause": "<text>"}`. The cause is one of:
+  - `connection refused by <host:port>`;
+  - `cannot resolve <host>: …`;
+  - `TLS certificate verification failed: …`, or `TLS error: …`;
+  - `the target closed the connection without a response`;
+  - `invalid response from the target: …`;
+  - `no complete response within the deadline of <n> s`;
+  - another socket error, by name and text.
 - The journal gets an entry with outcome `upstream_error`.
 - Nothing is recorded. A session in which the deadline fired is simply recorded again.
 
@@ -154,14 +163,19 @@ on, and trust follows §2. The standard library is a requirement, not an impleme
 would use its own `certifi` bundle and ignore both environment variables.
 
 **Cassette.** One interaction is appended per completed exchange, after redaction (§11), and written as in
-§8.
+§8. It is on disk before the client receives the response. The console closes the request's block with
+`PUT /v1/items → 201 (123 ms) recorded #5`, where the number is the interaction's 0-based index.
 
 **Reserved prefix.** Requests under `/_httpmocker` are never forwarded and never recorded (§13).
 
 ## 7. Upstream deadline
 
 - **Span.** `--upstream-timeout SECONDS` runs from the start of the connect to the last byte of the
-  response body. Each socket operation gets the time that remains.
+  response body.
+- **How it is kept.** The connect gets the whole deadline as its timeout. Once connected, a watchdog
+  shuts the socket down when the deadline passes. A target that keeps sending a byte at a time, in the
+  status line, the headers or the body, therefore cannot stretch the exchange. A body that ends with the
+  connection and is cut this way counts as a deadline error, never as a short body.
 - **Default.** 30 s.
 - **Why a total, not per read.** The recorder sends nothing until it has the last byte. A client waiting
   for the first byte therefore measures the whole exchange, even when its own timeout is per read. With a
@@ -177,14 +191,18 @@ would use its own `certifi` bundle and ignore both environment variables.
 **Writing**
 - `--record` writes the cassette with `"interactions": []` before the server listens. A permission
   problem then stops the start instead of failing the first request.
-- After every interaction the whole file is rewritten atomically: a temp file in the same directory,
-  flush, fsync, then `os.replace`. Cassettes are test-sized, so the cost of rewriting does not matter.
+- After every interaction the whole file is rewritten atomically: a temp file
+  (`.<name>.<pid>.tmp`) in the same directory, flush, fsync, then `os.replace`. Cassettes are
+  test-sized, so the cost of rewriting does not matter.
+- The JSON is indented by two spaces, for hand editing. The file's mode follows the umask, as for any
+  file the user creates; it is not a private 0600 temp file.
 
 **Starting on an existing file.** `--record` refuses to start unless the cassette path is one of:
 - absent;
 - a file of zero bytes;
-- a cassette with no interactions that is otherwise valid, as a session stopped before its first request
-  leaves it. Replay rejects such a cassette (§9), so it is only good for recording over.
+- a JSON object with `httpmocker_cassette` 1 and an empty `interactions`, as a session stopped before
+  its first request leaves it. Replay rejects such a cassette (§9), so it is only good for recording
+  over.
 
 There is no silent overwrite and no appending across sessions.
 
@@ -277,7 +295,9 @@ It checks:
   says otherwise;
 - **at least one interaction**, as a config needs at least one endpoint;
 - the method is one of the seven;
-- the path starts with `/`, contains no `?` or `#`, and is not under `/_httpmocker` (§13);
+- the path starts with `/` and is not under `/_httpmocker` (§13). Unlike a config path it may hold `?`
+  or `#`: a recorded path is percent-decoded, so a request for `/files/a%3Fb` is recorded as
+  `/files/a?b`, and replay matches it in the same decoded form;
 - the status is 100–599, as in config mode;
 - `delay_ms` is ≥ 0;
 - at most one body representation, and `body_base64` must be valid base64;
@@ -484,7 +504,8 @@ journal outcome `unmatched` already identifies those requests.
 
 - **The block.** Each request gets the multi-line block as in config mode: request line, headers (redacted,
   §11), pretty-printed body. Record and replay close it with a one-line verdict:
-  - record: `PUT /v1/items → 201 (123 ms) recorded #5`
+  - record: `PUT /v1/items → 201 (123 ms) recorded #5`; a failed exchange, in white on red:
+    `UPSTREAM ERROR: PUT /v1/items → 502, <cause>; nothing recorded`;
   - replay: `PUT /v1/items → 201 served #5 (2/3)`: interaction 5 of the cassette, the second of the
     three recorded for this request;
   - miss or exhausted, in white on red: `MISS: PUT /v1/b → 500, no recorded interaction for this

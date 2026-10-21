@@ -24,6 +24,9 @@ python -m httpmocker -p 8080 -c configs/example.json
 # Validate configuration without starting server
 python -m httpmocker -p 8080 -c configs/config.json --validate-config
 
+# Record a target into a new cassette (0.3.0)
+python -m httpmocker -p 8080 --record https://api.example.test --cassette cassettes/mine.json
+
 # Replay a cassette (0.3.0), or only validate it
 python -m httpmocker -p 8080 --replay cassettes/example.json
 python -m httpmocker -p 8080 --replay cassettes/example.json --validate-config
@@ -105,8 +108,8 @@ mypy httpmocker/
 The package is fully type-annotated and ships a `py.typed` marker. mypy runs in
 `strict` mode with the pydantic plugin; `bottle` has no type information, so its
 import is exempted via a per-module override in `pyproject.toml`, and a second
-override lets `request_handler`, `journal` and `replay` register their routes with Bottle's
-untyped decorator.
+override lets `request_handler`, `journal`, `replay` and `record` register their routes with
+Bottle's untyped decorator.
 
 ### Pre-commit Hooks
 
@@ -204,8 +207,8 @@ ones 0.3.0 adds:
    - Argument parsing (`-p/--port`, one mode of `-c/--config`, `--record`, `--replay`,
      `--validate-config`); the record options are checked and normalized here.
      `--replay FILE` serves a cassette through `replay.create_replay_app`, and with
-     `--validate-config` only validates it; record mode is not served yet: 0.3.0 is
-     building it
+     `--validate-config` only validates it. `--record` checks the cassette path, writes the
+     empty cassette, then serves `record.create_record_app`
    - `ClientPortRequestHandler` adds the request target and headers as received to the
      environ (`httpmocker.raw_target`, `httpmocker.raw_headers`), since wsgiref
      percent-decodes `PATH_INFO` and folds repeated headers
@@ -277,7 +280,11 @@ ones 0.3.0 adds:
    - `replay.py`: `create_replay_app` (sequences per key in `Player`, rewound by a journal
      reset; miss and exhausted answer 500 with the marker), the keys of recorded and live
      requests, and `body_bytes` of a recorded body
-   - `serving.py`: `send_as_given` sends a recorded (later: forwarded) status, headers and
+   - `record.py`: `create_record_app`; `Upstream` (http.client with
+     `ssl.create_default_context()`, a watchdog for the deadline of the whole exchange,
+     failures described as `UpstreamError`); `CassetteWriter` (atomic rewrite after every
+     interaction); `check_cassette_path`; `RecordSettings`
+   - `serving.py`: `send_as_given` sends a recorded or forwarded status, headers and
      body exactly; `without_default_content_type` wraps the app so that Bottle's default
      `Content-Type: text/html` is not added to a response recorded without one
 
@@ -324,6 +331,7 @@ The codebase includes comprehensive unit tests organized by module:
 - `tests/test_identity.py` - the request key: JSON Pointer parsing and deletion, body, query and header keys, rendering
 - `tests/test_replay.py` - replay through the app: the example scenario (round trip, exhausted, miss, reset), identity (ignore lists, canonical JSON, match headers, redacted query params), serving (sequences, body representations, exact headers, HEAD, delay) and redaction
 - `tests/test_serving.py` - sending a response exactly as given
+- `tests/test_record.py` - record against a synthetic stateful upstream (`http.server` in a thread): round trip into replay, forwarding (raw target, headers, redirects, encodings, HEAD), redaction, upstream errors and the deadline, a chunked request through the real server, the cassette path and writer, and TLS with a CA and certificate the `openssl` CLI generates per session (missing `openssl` fails the tests when `CI` is set, skips them otherwise)
 - `tests/test_cassette.py` - the cassette model (defaults, every validation rule, the shipped `cassettes/example.json`) and `load_cassette`
 - `tests/test_journal.py`, `tests/test_redaction.py`, `tests/test_bodies.py`, `tests/test_headers.py` - the journal (entries, counts, cap, request descriptions), redaction, body representation and header helpers; the journal endpoint and the reserved prefix through the app are in `tests/test_request_handler.py`
 
@@ -383,6 +391,7 @@ httpmocker/
 │   ├── headers.py              # Header sets and helpers (0.3.0)
 │   ├── identity.py             # Request key of replay (0.3.0)
 │   ├── replay.py               # Replay mode app (0.3.0)
+│   ├── record.py               # Record mode app, upstream client, cassette writer (0.3.0)
 │   ├── serving.py              # Send a recorded or forwarded response as given (0.3.0)
 │   ├── journal.py              # Request journal and reserved prefix (0.3.0)
 │   ├── redaction.py            # Redaction of headers and query parameters (0.3.0)
@@ -396,6 +405,7 @@ httpmocker/
 │   ├── test_identity.py
 │   ├── test_cassette.py
 │   ├── test_replay.py
+│   ├── test_record.py
 │   ├── test_serving.py
 │   ├── test_journal.py
 │   ├── test_redaction.py

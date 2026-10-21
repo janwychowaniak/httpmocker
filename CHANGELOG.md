@@ -8,6 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Record mode: `httpmocker -p PORT --record TARGET_BASE_URL --cassette FILE` forwards
+  every request to the target and returns its response. Each exchange is appended to the
+  cassette, which is rewritten atomically, so the file on disk is complete after every
+  interaction.
+  - Requests are forwarded as received: the raw path and query, headers in order with
+    repeats, and the body. Bodies are asked for without compression.
+  - Credentials are redacted in the cassette: `Authorization`, `Proxy-Authorization`,
+    `Cookie` and `Set-Cookie`, plus `--redact-header` and `--redact-query-param`.
+  - `--ignore-query-param`, `--ignore-json-path` and `--match-header` set the request
+    identity the cassette is replayed with.
+  - `--upstream-timeout` (default 30 s) bounds each whole exchange. A target that fails
+    or misses the deadline gets `502` with `X-Httpmocker: upstream-error`, and nothing is
+    recorded.
+  - TLS verification is always on and uses the system trust store, which `SSL_CERT_FILE`
+    / `SSL_CERT_DIR` override.
+  - A cassette that already holds interactions is never overwritten.
+
+  See `docs/record-replay.md` §6-§8.
 - Replay mode: `httpmocker -p PORT --replay CASSETTE` serves a cassette, a JSON file of
   recorded interactions. Each request is matched by an identity key: method, path,
   query, and a JSON body in canonical form. The cassette's lists can leave out

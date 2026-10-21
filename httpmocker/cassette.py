@@ -7,9 +7,10 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .config_loader import check_delay, check_method, check_path, check_status
+from .config_loader import check_delay, check_method, check_status
 from .headers import DEFAULT_REDACTED_HEADERS, TRANSPORT_HEADERS, HeaderValue
 from .identity import parse_json_pointer
+from .journal import RESERVED_PREFIX, is_reserved_path
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -96,8 +97,20 @@ class CassetteRequest(_Message):
     @field_validator("path")
     @classmethod
     def validate_path(cls, v: str) -> str:
-        """Ensure path looks like a request path, outside the reserved prefix."""
-        return check_path(v)
+        """Ensure path starts with '/' and lies outside the reserved prefix.
+
+        Unlike a config path it may hold '?' or '#': a recorded path is
+        percent-decoded, so a request for /a%3Fb is recorded as /a?b, and replay
+        matches it against the same decoded form.
+        """
+        if not v.startswith("/"):
+            raise ValueError(f"Path must start with '/', got: {v!r}")
+        if is_reserved_path(v):
+            raise ValueError(
+                f"Path must not be under {RESERVED_PREFIX!r}, which httpmocker reserves for"
+                f" its journal, got: {v!r}"
+            )
+        return v
 
 
 class CassetteResponse(_Message):

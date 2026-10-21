@@ -147,13 +147,19 @@ class TestInvalidCassettes:
         ("path", "message"),
         [
             ("v1/items", "must start with '/'"),
-            ("/v1/items?x=1", r"must not contain '\?' or '#'"),
-            ("/v1#top", r"must not contain '\?' or '#'"),
             ("/_httpmocker/journal", "reserves for its journal"),
         ],
     )
     def test_path(self, path, message):
         assert_invalid(cassette(interactions=[interaction(path=path)]), message)
+
+    @pytest.mark.parametrize("path", ["/files/a?b", "/files/a#b"])
+    def test_decoded_question_mark_and_hash_are_allowed(self, path):
+        """A request for /files/a%3Fb is recorded with its decoded path /files/a?b."""
+        assert (
+            Cassette(**cassette(interactions=[interaction(path=path)])).interactions[0].request.path
+            == path
+        )
 
     @pytest.mark.parametrize("status", [99, 600])
     def test_status(self, status):

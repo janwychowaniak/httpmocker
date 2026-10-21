@@ -557,15 +557,69 @@ class TestMainReplay:
         assert exc_info.value.code == 1
 
 
-class TestMainModesInProgress:
-    """Record mode is parsed, but not served until it is built."""
+class TestMainRecord:
+    """--record checks the cassette path, writes the empty cassette, then serves."""
 
-    def test_record_reports_it_is_not_available(self, monkeypatch, capsys):
-        monkeypatch.setattr("sys.argv", ["httpmocker", "-p", "8080", *RECORD])
+    @pytest.fixture(autouse=True)
+    def restore_sigterm_handler(self):
+        previous = signal.getsignal(signal.SIGTERM)
+        yield
+        signal.signal(signal.SIGTERM, previous)
+
+    def argv(self, cassette):
+        return [
+            "httpmocker",
+            "-p",
+            "0",
+            "--record",
+            "http://127.0.0.1:9",
+            "--cassette",
+            str(cassette),
+        ]
+
+    def test_record_writes_the_empty_cassette_and_serves(self, tmp_path, monkeypatch, capsys):
+        cassette = tmp_path / "c.json"
+        monkeypatch.setattr("sys.argv", self.argv(cassette))
+        served = {}
+
+        def fake_run(app, **kwargs):
+            served["app"] = app
+            # The cassette is on disk before the server listens
+            served["cassette"] = json.loads(cassette.read_text())
+            raise KeyboardInterrupt
+
+        monkeypatch.setattr("httpmocker.__main__.run", fake_run)
+        main()
+        assert callable(served["app"])
+        assert served["cassette"]["interactions"] == []
+        assert served["cassette"]["target"] == "http://127.0.0.1:9"
+        out = capsys.readouterr().out
+        assert "starting up (record)" in out
+        assert "Upstream deadline:      30 s" in out
+
+    def test_non_empty_cassette_is_refused(self, tmp_path, monkeypatch, capsys):
+        cassette = tmp_path / "c.json"
+        cassette.write_text("{}")
+        monkeypatch.setattr("sys.argv", self.argv(cassette))
+        monkeypatch.setattr(
+            "httpmocker.__main__.run", lambda *a, **k: pytest.fail("server started")
+        )
         with pytest.raises(SystemExit) as exc_info:
             main()
         assert exc_info.value.code == 1
-        assert "record mode is not available yet" in capsys.readouterr().out
+        assert "already exists and is not empty" in capsys.readouterr().out
+        assert cassette.read_text() == "{}"
+
+    def test_unwritable_cassette_is_refused(self, tmp_path, monkeypatch, capsys):
+        cassette = tmp_path / "missing-dir" / "c.json"
+        monkeypatch.setattr("sys.argv", self.argv(cassette))
+        monkeypatch.setattr(
+            "httpmocker.__main__.run", lambda *a, **k: pytest.fail("server started")
+        )
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 1
+        assert "Cannot write cassette file" in capsys.readouterr().out
 
 
 def capture_environ(send):

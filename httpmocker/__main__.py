@@ -16,7 +16,12 @@ if TYPE_CHECKING:
 
 from .cassette import load_cassette
 from .config_loader import load_config
-from .console_formatter import log_replay_startup, log_server_shutdown, log_server_startup
+from .console_formatter import (
+    log_record_startup,
+    log_replay_startup,
+    log_server_shutdown,
+    log_server_startup,
+)
 from .headers import (
     DEFAULT_REDACTED_HEADERS,
     RAW_HEADERS_KEY,
@@ -24,6 +29,7 @@ from .headers import (
     TRANSPORT_HEADERS,
 )
 from .identity import parse_json_pointer
+from .record import CassetteWriter, RecordSettings, check_cassette_path, create_record_app
 from .replay import create_replay_app
 from .request_handler import create_app
 
@@ -361,13 +367,34 @@ def main() -> None:
             print(f"✓ Found {len(cassette.interactions)} interaction(s)")
             return
 
-        # Record mode is being built (docs/record-replay.md)
-        if args.record is not None:
-            print("Error: record mode is not available yet")
-            sys.exit(1)
-
         app: WSGIApplication
-        if args.replay is not None:
+        if args.record is not None:
+            # Forward to the target and record into the cassette
+            settings = RecordSettings(
+                target=args.record,
+                cassette=args.cassette,
+                upstream_timeout=args.upstream_timeout,
+                ignore_query_params=tuple(args.ignore_query_param),
+                ignore_json_paths=tuple(args.ignore_json_path),
+                match_headers=tuple(args.match_header),
+                redact_headers=tuple(args.redact_header),
+                redact_query_params=tuple(args.redact_query_param),
+            )
+            try:
+                check_cassette_path(settings.cassette)
+            except ValueError as e:
+                print(f"Error: {e}")
+                sys.exit(1)
+            check_port_available(args.port)
+            writer = CassetteWriter(settings.cassette, settings.cassette_document())
+            try:
+                writer.start()
+            except OSError as e:
+                print(f"Error: Cannot write cassette file {settings.cassette}: {e.strerror or e}")
+                sys.exit(1)
+            app = create_record_app(settings, writer)
+            log_record_startup(args.port, settings)
+        elif args.replay is not None:
             # Serve a cassette
             cassette = load_cassette(args.replay)
             check_port_available(args.port)
