@@ -477,9 +477,11 @@ As config mode has `configs/example.json` and `smoke-tests.md`, replay gets the 
   `payloads/`.
 - **`smoke-tests.md`** gains a section with curl calls that replay the example cassette and query and
   reset the journal.
-- **`release.yml`.** Before pushing the image, the release workflow replays the example cassette in it and
-  queries the journal. That step runs only on a tag, so its first real check is the log of the 0.3.0
-  release.
+- **CI.** The CI workflow's image job already builds the image for the Trivy scan. It also replays the
+  example cassette in that image and queries the journal, so a break shows on a push or a pull request.
+- **`release.yml`.** Before pushing the image, the release workflow runs the same replay and journal query
+  against the image it is about to publish. That step runs only on a tag; the CI job has exercised the
+  same check beforehand, but the release step's own first run is the 0.3.0 release.
 
 ## 18. Tests in the repository
 
