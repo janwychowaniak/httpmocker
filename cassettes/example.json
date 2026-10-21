@@ -1,0 +1,101 @@
+{
+  "httpmocker_cassette": 1,
+  "tool_version": "0.3.0",
+  "recorded_at": "2026-10-21T12:00:00.000Z",
+  "target": "https://api.example.test",
+  "identity": {
+    "ignore_query_params": ["ts"],
+    "ignore_json_paths": ["/request_id"],
+    "match_headers": []
+  },
+  "redacted_headers": ["authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key"],
+  "redacted_query_params": [],
+  "interactions": [
+    {
+      "request": {
+        "method": "PUT",
+        "path": "/api/items/sample",
+        "query": {"ts": ["1761048000"]},
+        "headers": {"content-type": "application/json", "x-api-key": "<redacted>"},
+        "body": {"name": "sample", "request_id": "r-1"}
+      },
+      "response": {
+        "status": 201,
+        "headers": {"content-type": "application/json"},
+        "body": {"id": 7, "name": "sample"}
+      },
+      "meta": {"recorded_at": "2026-10-21T12:00:01.120Z", "duration_ms": 84, "delay_ms": 0}
+    },
+    {
+      "request": {
+        "method": "PUT",
+        "path": "/api/items/sample",
+        "query": {"ts": ["1761048002"]},
+        "headers": {"content-type": "application/json", "x-api-key": "<redacted>"},
+        "body": {"name": "sample", "request_id": "r-2"}
+      },
+      "response": {
+        "status": 409,
+        "headers": {"content-type": "application/json"},
+        "body": {"error": "item already exists", "id": 7}
+      },
+      "meta": {"recorded_at": "2026-10-21T12:00:02.310Z", "duration_ms": 41, "delay_ms": 0}
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/api/items",
+        "headers": {"x-api-key": "<redacted>"}
+      },
+      "response": {
+        "status": 200,
+        "headers": {"content-type": "application/json"},
+        "body": [{"id": 7, "name": "sample"}]
+      },
+      "meta": {"recorded_at": "2026-10-21T12:00:03.050Z", "duration_ms": 37, "delay_ms": 250}
+    },
+    {
+      "request": {
+        "method": "DELETE",
+        "path": "/api/items/sample",
+        "headers": {"x-api-key": "<redacted>"}
+      },
+      "response": {"status": 204},
+      "meta": {"recorded_at": "2026-10-21T12:00:04.480Z", "duration_ms": 52, "delay_ms": 0}
+    },
+    {
+      "request": {
+        "method": "DELETE",
+        "path": "/api/items/sample",
+        "headers": {"x-api-key": "<redacted>"}
+      },
+      "response": {"status": 204},
+      "meta": {"recorded_at": "2026-10-21T12:00:05.120Z", "duration_ms": 33, "delay_ms": 0}
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/api/items",
+        "headers": {"x-api-key": "<redacted>"}
+      },
+      "response": {
+        "status": 200,
+        "headers": {"content-type": "application/json"},
+        "body": []
+      },
+      "meta": {"recorded_at": "2026-10-21T12:00:06.700Z", "duration_ms": 35, "delay_ms": 0}
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/api/health"
+      },
+      "response": {
+        "status": 200,
+        "headers": {"content-type": "text/plain; charset=utf-8"},
+        "body_text": "ok"
+      },
+      "meta": {"recorded_at": "2026-10-21T12:00:07.010Z", "duration_ms": 12, "delay_ms": 0}
+    }
+  ]
+}

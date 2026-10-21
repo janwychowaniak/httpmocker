@@ -14,6 +14,7 @@ from bottle import run
 if TYPE_CHECKING:
     from _typeshed.wsgi import WSGIApplication
 
+from .cassette import load_cassette
 from .config_loader import load_config
 from .console_formatter import log_server_shutdown, log_server_startup
 from .headers import (
@@ -351,6 +352,13 @@ def main() -> None:
     try:
         # Parse command line arguments
         args = parse_arguments()
+
+        # Validate a cassette and exit
+        if args.replay is not None and args.validate_config:
+            cassette = load_cassette(args.replay)
+            print(f"✓ Cassette file '{args.replay}' is valid")
+            print(f"✓ Found {len(cassette.interactions)} interaction(s)")
+            return
 
         # Record and replay are being built (docs/record-replay.md)
         if args.config is None:

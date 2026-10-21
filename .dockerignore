@@ -57,9 +57,10 @@ tests/
 LICENSE
 docs/
 
-# Configs and payloads: mounted at run time, never part of the image
+# Configs, payloads and cassettes: mounted at run time, never part of the image
 configs/
 payloads/
+cassettes/
 
 # Docker
 Dockerfile

@@ -209,13 +209,15 @@ __marimo__/
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# httpmocker - user-managed configs and payloads live in configs/ and payloads/;
-# keep only the shipped examples
+# httpmocker - user-managed configs, payloads and cassettes live in configs/,
+# payloads/ and cassettes/; keep only the shipped examples
 configs/*.json
 !configs/example.json
 payloads/*.json
 !payloads/example.json
 !payloads/urls_list.json
+cassettes/*.json
+!cassettes/example.json
 
 
 # --------------- Environments ---------------

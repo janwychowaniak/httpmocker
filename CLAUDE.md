@@ -198,8 +198,9 @@ ones 0.3.0 adds:
 
 1. **`__main__.py`** - CLI entry point
    - Argument parsing (`-p/--port`, one mode of `-c/--config`, `--record`, `--replay`,
-     `--validate-config`); the record options are checked and normalized here. Record and
-     replay are parsed but not served yet: 0.3.0 is building them step by step
+     `--validate-config`); the record options are checked and normalized here.
+     `--replay FILE --validate-config` validates a cassette; record and replay are not
+     served yet: 0.3.0 is building them step by step
    - `ClientPortRequestHandler` adds the request target and headers as received to the
      environ (`httpmocker.raw_target`, `httpmocker.raw_headers`), since wsgiref
      percent-decodes `PATH_INFO` and folds repeated headers
@@ -260,6 +261,9 @@ ones 0.3.0 adds:
      in the journal
    - `bodies.py`: body representation shared by cassettes and the journal (`body`,
      `body_text`, `body_base64`)
+   - `cassette.py`: the strict pydantic model of a cassette (unknown fields are errors) and
+     `load_cassette`, used by `--replay FILE --validate-config`; it reuses the method, path,
+     status and delay checks of `config_loader` (`check_method`, `check_path`, ...)
    - `headers.py`: transport and default redacted header sets, the raw environ keys, header
      pairs and mappings
    - `identity.py`: request identity for replay (JSON Pointer parsing so far)
@@ -305,6 +309,7 @@ The codebase includes comprehensive unit tests organized by module:
 - `tests/test_console_formatter.py` - payload-source formatting, request/response logging, and lifecycle banners
 - `tests/test_main.py` - CLI argument parsing (run modes, record options, target URL checks), port-availability checks (including a port left in TIME_WAIT), the `--validate-config` path, shutdown on SIGTERM, and the request handler (client port, interrupted requests, raw target and headers)
 - `tests/test_identity.py` - request identity helpers (JSON Pointer parsing so far)
+- `tests/test_cassette.py` - the cassette model (defaults, every validation rule, the shipped `cassettes/example.json`) and `load_cassette`
 - `tests/test_journal.py`, `tests/test_redaction.py`, `tests/test_bodies.py`, `tests/test_headers.py` - the journal (entries, counts, cap, request descriptions), redaction, body representation and header helpers; the journal endpoint and the reserved prefix through the app are in `tests/test_request_handler.py`
 
 When adding features, follow the existing test structure with descriptive docstrings and organized test classes.
@@ -365,12 +370,14 @@ httpmocker/
 │   ├── journal.py              # Request journal and reserved prefix (0.3.0)
 │   ├── redaction.py            # Redaction of headers and query parameters (0.3.0)
 │   ├── bodies.py               # Body representation for cassettes and journal (0.3.0)
+│   ├── cassette.py             # Cassette model, validation and loading (0.3.0)
 │   └── py.typed                # PEP 561 typing marker
 ├── tests/                      # Unit tests
 │   ├── test_config_loader.py
 │   ├── test_request_handler.py
 │   ├── test_console_formatter.py
 │   ├── test_identity.py
+│   ├── test_cassette.py
 │   ├── test_journal.py
 │   ├── test_redaction.py
 │   ├── test_bodies.py
@@ -381,6 +388,8 @@ httpmocker/
 ├── payloads/                   # External payload files
 │   ├── example.json
 │   └── urls_list.json
+├── cassettes/                  # Recorded conversations for --replay
+│   └── example.json            # Example cassette (hand-written)
 ├── docs/
 │   └── record-replay.md        # Contract of record, replay and the journal (0.3.0)
 ├── scripts/

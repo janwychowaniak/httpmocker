@@ -217,14 +217,23 @@ There is no silent overwrite and no appending across sessions.
 }
 ```
 
+**Required and optional fields.** Required: `httpmocker_cassette`, `interactions`, and in each interaction
+`request.method`, `request.path` and `response.status`. Everything else may be left out, which matters for
+a hand-written cassette:
+- `tool_version`, `recorded_at`, `target`, `meta.recorded_at` and `meta.duration_ms` are absent;
+- the `identity` lists, `redacted_query_params`, `query` and `headers` are empty;
+- `redacted_headers` holds the four defaults of §11;
+- `meta.delay_ms` is `0`.
+
 **Request fields**
 - `path` is the decoded path, the identity form.
 - `query` is the parsed multimap `{name: [values]}`, with blank values kept. A redacted parameter's
   values are `<redacted>`.
 
 **Headers**
-- Names are lower-cased.
-- A repeated header is a list of strings; otherwise the value is a string.
+- Names are lower-cased; validation refuses a name with a capital letter, here and in `match_headers` and
+  `redacted_headers`.
+- A repeated header is a non-empty list of strings; otherwise the value is a string.
 - A redacted header's value is `<redacted>`.
 
 **Bodies.** Exactly one representation, or none; an empty body has none.
@@ -236,6 +245,9 @@ There is no silent overwrite and no appending across sessions.
 - `body_text`: any other body that is valid UTF-8. It is decoded as UTF-8 whatever charset is declared,
   and re-encoded as UTF-8 on replay.
 - `body_base64`: anything else.
+
+`"body": null` is a body: a JSON `null`. It counts as a representation, so a message cannot also carry
+`body_text` or `body_base64`.
 
 **What replay serves**
 - `body` as canonical compact JSON. The bytes may differ from what the target sent, so JSON bodies are
@@ -251,8 +263,14 @@ There is no silent overwrite and no appending across sessions.
 interactions. Validation catches structural mistakes, not semantic ones. A hand-added request without a
 `content-type` keys its `body_text` as raw UTF-8 bytes.
 
-**Validation is strict.** It runs when `--replay` starts and with `--replay FILE --validate-config`. Any
-error exits with code 1. It checks:
+**Validation is strict.** It runs when `--replay` starts and with `--replay FILE --validate-config`. A valid
+cassette prints `✓ Cassette file '<file>' is valid` and its number of interactions. Any error exits with
+code 1, with pydantic's report naming each error's place (e.g. `interactions.2.meta.delay`). As with a
+config, checks that span several fields show once the fields themselves pass:
+- the transport headers of an interaction;
+- `match_headers` against `redacted_headers`.
+
+It checks:
 - unknown fields are errors;
 - `httpmocker_cassette` must be `1`. A later format version may refuse version-1 files unless its release
   says otherwise;
@@ -481,9 +499,16 @@ journal outcome `unmatched` already identifies those requests.
 
 As config mode has `configs/example.json` and `smoke-tests.md`, replay gets the same:
 
-- **Example.** A hand-written `cassettes/example.json` shows sequences, such as a `PUT` that answers `201`,
-  then `409`. `.gitignore` keeps only the shipped example in `cassettes/`, as it does for `configs/` and
-  `payloads/`.
+- **Example.** A hand-written `cassettes/example.json` holds seven interactions:
+  - `PUT /api/items/sample` answering `201`, then `409`;
+  - `GET /api/items` with the item, after a hand-added `delay_ms` of 250;
+  - `DELETE` twice, both `204`;
+  - `GET /api/items` empty;
+  - `GET /api/health` with a `body_text`.
+
+  It ignores `ts` and `/request_id` for identity and redacts `x-api-key`. A test keeps it valid.
+  `.gitignore` keeps only the shipped example in `cassettes/`, as it does for `configs/` and `payloads/`,
+  and `.dockerignore` keeps `cassettes/` out of the image.
 - **`smoke-tests.md`** gains a section with curl calls that replay the example cassette and query and
   reset the journal.
 - **CI.** The CI workflow's image job already builds the image for the Trivy scan. It also replays the

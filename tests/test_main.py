@@ -15,6 +15,7 @@ import sys
 import threading
 import time
 from email.message import Message
+from pathlib import Path
 from wsgiref.simple_server import WSGIRequestHandler, make_server
 
 import pytest
@@ -491,6 +492,29 @@ class TestNormalizeTargetUrl:
             normalize_target_url(url)
         assert "s3cret" not in str(exc_info.value)
         assert "user@" not in str(exc_info.value)
+
+
+class TestMainValidateCassette:
+    def test_valid_cassette_reports_and_returns(self, monkeypatch, capsys):
+        example = str(Path(__file__).resolve().parent.parent / "cassettes" / "example.json")
+        monkeypatch.setattr(
+            "sys.argv", ["httpmocker", "-p", "8080", "--replay", example, "--validate-config"]
+        )
+        main()
+        out = capsys.readouterr().out
+        assert "is valid" in out
+        assert "7 interaction(s)" in out
+
+    def test_invalid_cassette_exits_1(self, tmp_path, monkeypatch, capsys):
+        bad = tmp_path / "bad.json"
+        bad.write_text(json.dumps({"httpmocker_cassette": 1, "interactions": []}))
+        monkeypatch.setattr(
+            "sys.argv", ["httpmocker", "-p", "8080", "--replay", str(bad), "--validate-config"]
+        )
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 1
+        assert "At least one interaction" in capsys.readouterr().out
 
 
 class TestMainModesInProgress:

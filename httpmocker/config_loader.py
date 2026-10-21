@@ -13,6 +13,54 @@ from .journal import RESERVED_PREFIX, is_reserved_path
 SUPPORTED_METHODS = ("GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS")
 
 
+def check_method(v: str) -> str:
+    """Ensure HTTP method is uppercase and one the server routes."""
+    if not v.isupper():
+        raise ValueError(f"HTTP method must be uppercase, got: {v}")
+    if v not in SUPPORTED_METHODS:
+        supported = ", ".join(SUPPORTED_METHODS)
+        raise ValueError(f"HTTP method must be one of {supported}, got: {v}")
+    return v
+
+
+def check_path(v: str) -> str:
+    """Ensure path looks like a request path: a leading '/', no query or fragment.
+
+    Matching ignores the query string and clients do not send the fragment, so
+    a path with '?' or '#' would only match a request that encodes the
+    character as %3F or %23. Paths under /_httpmocker belong to the server
+    itself (the journal), so nothing can be served there.
+    """
+    if not v.startswith("/"):
+        raise ValueError(f"Path must start with '/', got: {v!r}")
+    if "?" in v or "#" in v:
+        base = v.split("?", 1)[0].split("#", 1)[0]
+        raise ValueError(
+            f"Path must not contain '?' or '#', got: {v!r}; query strings and fragments"
+            f" are not part of matching, so use {base!r}, which answers any query string"
+        )
+    if is_reserved_path(v):
+        raise ValueError(
+            f"Path must not be under {RESERVED_PREFIX!r}, which httpmocker reserves for"
+            f" its journal, got: {v!r}"
+        )
+    return v
+
+
+def check_status(v: int) -> int:
+    """Ensure status code is valid HTTP status."""
+    if not 100 <= v <= 599:
+        raise ValueError(f"HTTP status code must be between 100-599, got: {v}")
+    return v
+
+
+def check_delay(v: int) -> int:
+    """Ensure delay is non-negative."""
+    if v < 0:
+        raise ValueError(f"Delay must be non-negative, got: {v}")
+    return v
+
+
 class Endpoint(BaseModel):
     """Configuration model for a single API endpoint."""
 
@@ -29,53 +77,25 @@ class Endpoint(BaseModel):
     @classmethod
     def validate_method(cls, v: str) -> str:
         """Ensure HTTP method is uppercase and one the server routes."""
-        if not v.isupper():
-            raise ValueError(f"HTTP method must be uppercase, got: {v}")
-        if v not in SUPPORTED_METHODS:
-            supported = ", ".join(SUPPORTED_METHODS)
-            raise ValueError(f"HTTP method must be one of {supported}, got: {v}")
-        return v
+        return check_method(v)
 
     @field_validator("path")
     @classmethod
     def validate_path(cls, v: str) -> str:
-        """Ensure path looks like a request path: a leading '/', no query or fragment.
-
-        Matching ignores the query string and clients do not send the fragment, so
-        a path with '?' or '#' would only match a request that encodes the
-        character as %3F or %23. Paths under /_httpmocker belong to the server
-        itself (the journal), so no endpoint can be served there.
-        """
-        if not v.startswith("/"):
-            raise ValueError(f"Path must start with '/', got: {v!r}")
-        if "?" in v or "#" in v:
-            base = v.split("?", 1)[0].split("#", 1)[0]
-            raise ValueError(
-                f"Path must not contain '?' or '#', got: {v!r}; query strings and fragments"
-                f" are not part of matching, so use {base!r}, which answers any query string"
-            )
-        if is_reserved_path(v):
-            raise ValueError(
-                f"Path must not be under {RESERVED_PREFIX!r}, which httpmocker reserves for"
-                f" its journal, got: {v!r}"
-            )
-        return v
+        """Ensure path looks like a request path (see ``check_path``)."""
+        return check_path(v)
 
     @field_validator("status")
     @classmethod
     def validate_status(cls, v: int) -> int:
         """Ensure status code is valid HTTP status."""
-        if not 100 <= v <= 599:
-            raise ValueError(f"HTTP status code must be between 100-599, got: {v}")
-        return v
+        return check_status(v)
 
     @field_validator("delay_ms")
     @classmethod
     def validate_delay(cls, v: int) -> int:
         """Ensure delay is non-negative."""
-        if v < 0:
-            raise ValueError(f"Delay must be non-negative, got: {v}")
-        return v
+        return check_delay(v)
 
     def __init__(self, **data: Any) -> None:
         super().__init__(**data)
