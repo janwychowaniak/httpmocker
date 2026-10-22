@@ -549,8 +549,7 @@ As config mode has `configs/example.json` and `smoke-tests.md`, replay gets the 
 - **CI.** The CI workflow's image job already builds the image for the Trivy scan. It also runs the
   script on that image, so a break shows on a push or a pull request.
 - **`release.yml`.** Before pushing the image, the release workflow runs the same script against the
-  image it is about to publish. That step runs only on a tag, so its own first run is the 0.3.0
-  release, but the script has run in CI on every push before.
+  image it is about to publish. That step runs only on a tag; it first ran on `v0.3.0` and passed.
 
 ## 18. Tests in the repository
 
@@ -642,12 +641,3 @@ These run against the published image and wheel. The repository's own suite cove
 
 **Release.** 0.3.0 by the repository's routine: the CHANGELOG records the digest and the image Id, and the
 release files ship with `SHA256SUMS`.
-
-**Build order.** On `main`, each step committed and green on CI before the next:
-1. request handler (raw target and headers) and CLI modes;
-2. journal and reserved prefix, in every mode;
-3. cassette model and validation;
-4. replay;
-5. record: forwarding, TLS, redaction, atomic writes, deadline;
-6. docs and examples;
-7. release.

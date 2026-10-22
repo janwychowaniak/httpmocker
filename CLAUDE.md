@@ -293,6 +293,7 @@ ones 0.3.0 adds:
 
 ### Data Flow
 
+Config mode (`-c`):
 1. CLI parses arguments → `load_config()` validates JSON and payload files
 2. `create_app()` builds Bottle application with endpoint dictionary
 3. For each incoming request:
@@ -303,10 +304,26 @@ ones 0.3.0 adds:
    - Add a journal entry with the outcome and the status answered
    - Log response details and "sent" confirmation
 
+Replay (`--replay`): `load_cassette()` validates the cassette → `create_replay_app()`
+groups the interactions into sequences by request key → for each request: compute its
+key (`replay.live_key`) → serve the next interaction of that sequence as recorded
+(`send_as_given`, with `delay_ms`), or answer `miss` / `exhausted` with `500` → journal.
+
+Record (`--record`): `check_cassette_path()` → the empty cassette is written →
+`create_record_app()` → for each request: forward it to the target (`Upstream.exchange`,
+within the deadline) → append the redacted interaction to the cassette (atomic rewrite)
+→ send the target's response as given → journal; a failed exchange answers `502` and
+records nothing.
+
 ### Key Design Decisions
 
-- **Exact matching only**: Paths must match exactly (trailing slashes matter, `/api/users` ≠ `/api/users/`)
-- **No templating or dynamic routing**: Static configuration for predictable behavior
+- **Exact matching only** (config mode): Paths must match exactly (trailing slashes matter, `/api/users` ≠ `/api/users/`)
+- **No templating or dynamic routing**: Static configuration for predictable behavior, in
+  every mode; a cassette is just as literal
+- **Record and replay**: the decisions and their reasons are in `docs/record-replay.md` §2
+  (the recorded order is the only state, the end of a sequence is an error, replay never
+  falls back to the target, upstream TLS trusts the system store). Replay matches by its
+  own key (method, path, query, body, matched headers), not by config mode's rules
 - **Fail-fast on config errors**: a config the server could not serve (unsupported method,
   path without a leading `/` or with `?` or `#`, missing or invalid payload file)
   stops it at startup rather than surfacing later as failed requests
